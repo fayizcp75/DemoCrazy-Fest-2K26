@@ -1,4 +1,4 @@
-const CACHE = 'democrazy-shell-v1';
+const CACHE = 'democrazy-shell-v2';
 const SHELL = ['/', '/index.html', '/manifest.json'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
