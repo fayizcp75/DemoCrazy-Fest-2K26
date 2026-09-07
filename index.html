@@ -446,6 +446,7 @@ table.admin-table th{text-align:left;color:var(--text-faint);font-size:10px;text
 table.admin-table td{padding:10px 8px;border-bottom:1px solid var(--border-soft);}
 .row-actions{display:flex;gap:6px;}
 .mini-btn{padding:5px 9px;font-size:10.5px;border-radius:8px;background:var(--elev);border:1px solid var(--border);color:var(--text-dim);font-weight:700;}
+.mini-btn.danger{color:#ff6b6b;border-color:rgba(255,70,70,.28);}
 
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--elev);border:1px solid var(--accent);color:var(--text);padding:11px 20px;border-radius:14px;font-size:12.5px;font-weight:600;z-index:90;opacity:0;transition:all .25s ease;box-shadow:0 10px 30px -10px rgba(0,0,0,.6);display:flex;align-items:center;gap:8px;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -1196,7 +1197,7 @@ function pageAdminParticipants(){
     <tr><th>Name</th><th>Chest</th><th>Team</th><th>Pts</th><th></th></tr>
     ${[...DB.participants].sort((a,b)=>String(a.chest).localeCompare(String(b.chest),undefined,{numeric:true})).map(p=>`
       <tr><td>${p.name}</td><td>#${p.chest}</td><td>${team(p.teamId)?.name||'—'}</td><td>${p.points}</td>
-      <td><div class="row-actions"><button class="mini-btn" onclick="openParticipantForm('${p.id}')">Edit</button></div></td></tr>
+      <td><div class="row-actions"><button class="mini-btn" onclick="openParticipantForm('${p.id}')">Edit</button><button class="mini-btn danger" onclick="deleteParticipant('${p.id}')">Delete</button></div></td></tr>
     `).join('')}
   </table>
   </div>
@@ -1241,7 +1242,7 @@ function pageAdminTeams(){
       <div class="tc-badge" style="width:36px;height:36px;font-size:12px;margin:0;background:linear-gradient(145deg,${t.color},#0a0a0a)">${initials(t.name)}</div>
       <div style="flex:1;"><div style="font-weight:700;font-size:13.5px;">${t.name}</div>
       <div style="font-size:11px;color:var(--text-dim);">${DB.participants.filter(p=>p.teamId===t.id).length} members · ${t.leaderIds.length} leader(s)</div></div>
-      <button class="mini-btn" onclick="openTeamForm('${t.id}')">Edit</button>
+      <div class="row-actions"><button class="mini-btn" onclick="openTeamForm('${t.id}')">Edit</button><button class="mini-btn danger" onclick="deleteTeam('${t.id}')">Delete</button></div>
     </div>
   `).join('')}
   `);
@@ -1249,13 +1250,13 @@ function pageAdminTeams(){
 function openTeamForm(id){
   const t = id ? team(id) : null;
   const members = t ? DB.participants.filter(p=>p.teamId===t.id).sort((a,b)=>String(a.chest).localeCompare(String(b.chest),undefined,{numeric:true})) : [];
-  const leaderId = t && t.leaderIds && t.leaderIds.length ? t.leaderIds[0] : '';
+  const leaderIds = t && Array.isArray(t.leaderIds) ? t.leaderIds : [];
   openModal(`
     <div class="modal-head"><h3>${t?'Edit Team':'Add Team'}</h3><button class="icon-btn" onclick="closeModal()">${ic('x',16)}</button></div>
     <form onsubmit="saveTeam(event,'${id||''}')">
       <div class="field"><label>Team Name</label><input id="tf-name" required value="${t?t.name:''}"></div>
       <div class="field"><label>Team Color</label><input id="tf-color" type="color" value="${t?t.color:'#8b5cf6'}" style="height:44px;padding:4px;"></div>
-      ${id ? `<div class="field"><label>Team Leader</label><select id="tf-leader"><option value="">No Leader</option>${members.map(m=>`<option value="${m.id}" ${m.id===leaderId?'selected':''}>${m.name} · #${m.chest}</option>`).join('')}</select></div>` : ''}
+      ${id ? `<div class="field"><label>Team Leaders</label><select id="tf-leader" multiple size="4">${members.map(m=>`<option value="${m.id}" ${leaderIds.includes(m.id)?'selected':''}>${m.name} · #${m.chest}</option>`).join('')}</select><div class="hint">Select one or more leaders.</div></div>` : ''}
       <button class="btn btn-primary btn-block" type="submit">${ic('check',16)} Save Team</button>
     </form>
   `);
@@ -1285,7 +1286,7 @@ function pageAdminEvents(){
     <tr><th>Event</th><th>Date</th><th>Time</th><th>Status</th><th></th></tr>
     ${DB.events.map(e=>`
       <tr><td>${e.name}</td><td>${fmtDate(e.date)}</td><td>${fmtTime(e.time)}</td><td>${statusChip(e.status)}</td>
-      <td><button class="mini-btn" onclick="openEventForm('${e.id}')">Edit</button></td></tr>
+      <td><div class="row-actions"><button class="mini-btn" onclick="openEventForm('${e.id}')">Edit</button><button class="mini-btn danger" onclick="deleteEvent('${e.id}')">Delete</button></div></td></tr>
     `).join('')}
   </table>
   </div>
@@ -1364,6 +1365,7 @@ function renderSelectedEventList(eid){
           <div class="name">${p.name} <span style="color:var(--text-faint);font-weight:600;">#${p.chest}</span></div>
           <div class="sub">${t?.name||'No team'}</div>
         </div>
+        <button class="mini-btn danger" onclick="deleteRegistration('${r.id}')">Delete</button>
       </div>` : '';
   }).join('');
   return rows || `<div class="empty">${ic('users',36)}<b>No participants registered</b>Select an event and register participants.</div>`;
@@ -1435,7 +1437,7 @@ function pageAdminResults(){
 
       <div class="field"><label>Prize</label><select id="res-prize" onchange="syncResultPoints()">
         <option value="">NO PRIZE</option>
-        <option value="1">1ST</option>
+        <option value="1ST">1ST</option>
         <option value="2">2ND</option>
         <option value="3">3RD</option>
       </select></div>
@@ -1455,7 +1457,7 @@ function pageAdminResults(){
     <div class="section-head"><h2>All Results</h2></div>
     <div class="card" style="padding:6px 10px;overflow-x:auto;">
     <table class="admin-table">
-      <tr><th>Event</th><th>Prize</th><th>Grade</th><th>Participant</th><th>Team</th><th>Pts</th></tr>
+      <tr><th>Event</th><th>Prize</th><th>Grade</th><th>Participant</th><th>Team</th><th>Pts</th><th></th></tr>
       ${DB.results.map(r=>{
         const p=participant(r.participantId);
         return `<tr>
@@ -1465,6 +1467,7 @@ function pageAdminResults(){
           <td>${p.name} #${p.chest}</td>
           <td>${team(p.teamId)?.name}</td>
           <td>${r.points}</td>
+          <td><div class="row-actions"><button class="mini-btn" onclick="editResult('${r.id}')">Edit</button><button class="mini-btn danger" onclick="deleteResult('${r.id}')">Delete</button></div></td>
         </tr>`;
       }).join('')}
     </table>
@@ -1476,7 +1479,7 @@ function syncResultPoints(){
   const prize=document.getElementById('res-prize')?.value;
   const points=document.getElementById('res-points');
   if(!points) return;
-  points.value = prize==='1' ? 10 : prize==='2' ? 7 : prize==='3' ? 5 : 0;
+  points.value = prize==='1ST' ? 10 : prize==='2' ? 7 : prize==='3' ? 5 : 0;
 }
 function resLookup(){
   const chest=document.getElementById('res-chest').value.trim();
@@ -1519,7 +1522,7 @@ function pageAdminAnnouncements(){
   <button class="btn btn-primary btn-block" style="margin-bottom:16px;" onclick="openAnnForm()">${ic('plus',16)} Add Announcement</button>
   ${[...DB.announcements].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(a=>`
     <div class="card announce-card">
-      <div class="a-top"><h4>${a.title}</h4><button class="mini-btn" onclick="openAnnForm('${a.id}')">Edit</button></div>
+      <div class="a-top"><h4>${a.title}</h4><div class="row-actions"><button class="mini-btn" onclick="openAnnForm('${a.id}')">Edit</button><button class="mini-btn danger" onclick="deleteAnnouncement('${a.id}')">Delete</button></div></div>
       <p>${a.message}</p><div class="a-date" style="margin-top:8px;">${fmtDateTime(a.date)}</div>
     </div>`).join('')}
   `);
@@ -1552,7 +1555,7 @@ function pageAdminCommittee(){
   ${DB.committee.map(c=>`
     <div class="card committee-card">
       <div class="a-top" style="display:flex;justify-content:space-between;align-items:center;">
-        <div class="role">${c.role}</div><button class="mini-btn" onclick="openCommForm('${c.id}')">Edit</button>
+        <div class="role">${c.role}</div><div class="row-actions"><button class="mini-btn" onclick="openCommForm('${c.id}')">Edit</button><button class="mini-btn danger" onclick="deleteContact('${c.id}')">Delete</button></div>
       </div>
       <div class="cc-row">${contactPhoto(c)}
       <div><div class="cc-name">${c.name}</div><div class="cc-phone">${ic('phone',13)} ${c.phone}</div></div></div>
@@ -1634,6 +1637,112 @@ function renderReport(){
 }
 
 
+
+/* ============================= ADMIN DELETE / EDIT ACTIONS ============================= */
+async function deleteParticipant(id){
+  const p=participant(id);
+  if(!p) return;
+  if(!confirm(`Delete participant "${p.name}" (#${p.chest})? This will also remove their registrations and results.`)) return;
+  const {error:rerr}=await sb.from('registrations').delete().eq('participant_id',id);
+  if(rerr){sbToastError(rerr,'Could not delete participant');return;}
+  const {error:xerr}=await sb.from('results').delete().eq('participant_id',id);
+  if(xerr){sbToastError(xerr,'Could not delete participant');return;}
+  const {data:teams,error:terr}=await sb.from('teams').select('id,leader_ids');
+  if(terr){sbToastError(terr,'Could not delete participant');return;}
+  for(const t of (teams||[])){
+    const leaders=Array.isArray(t.leader_ids)?t.leader_ids:[];
+    if(leaders.includes(id)){
+      const {error:ler}=await sb.from('teams').update({leader_ids:leaders.filter(x=>x!==id)}).eq('id',t.id);
+      if(ler){sbToastError(ler,'Could not delete participant');return;}
+    }
+  }
+  const {error}=await sb.from('participants').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete participant');return;}
+  await loadRemoteDB(); render(); toast(`${p.name} deleted`);
+}
+
+async function deleteTeam(id){
+  const t=team(id);
+  if(!t) return;
+  const count=DB.participants.filter(p=>p.teamId===id).length;
+  if(!confirm(`Delete team "${t.name}"?${count?` ${count} participant(s) will be unassigned from this team.`:''}`)) return;
+  if(count){
+    const {error}=await sb.from('participants').update({team_id:null}).eq('team_id',id);
+    if(error){sbToastError(error,'Could not delete team');return;}
+  }
+  const {error}=await sb.from('teams').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete team');return;}
+  await loadRemoteDB(); render(); toast(`${t.name} deleted`);
+}
+
+async function deleteEvent(id){
+  const e=event_(id);
+  if(!e) return;
+  if(!confirm(`Delete event "${e.name}"? This will also remove its registrations and results.`)) return;
+  const {error:rr}=await sb.from('registrations').delete().eq('event_id',id);
+  if(rr){sbToastError(rr,'Could not delete event');return;}
+  const {error:xr}=await sb.from('results').delete().eq('event_id',id);
+  if(xr){sbToastError(xr,'Could not delete event');return;}
+  const {error}=await sb.from('events').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete event');return;}
+  await loadRemoteDB(); render(); toast(`${e.name} deleted`);
+}
+
+async function deleteRegistration(id){
+  const r=(window._registrations||[]).find(x=>x.id===id);
+  if(!r) return;
+  const p=participant(r.pid), e=event_(r.eid);
+  if(!confirm(`Remove ${p?.name||'this participant'} from ${e?.name||'this event'}?`)) return;
+  const {error}=await sb.from('registrations').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete registration');return;}
+  await loadRemoteDB(); render(); toast('Registration deleted');
+}
+
+function editResult(id){
+  const r=DB.results.find(x=>x.id===id);
+  if(!r) return;
+  const p=participant(r.participantId);
+  if(!p) return;
+  const ev=document.getElementById('res-event'), chest=document.getElementById('res-chest');
+  const prize=document.getElementById('res-prize'), grade=document.getElementById('res-grade'), points=document.getElementById('res-points');
+  if(ev) ev.value=r.eventId;
+  if(chest) chest.value=p.chest;
+  if(prize) prize.value=r.prize || (r.position===1?'1ST':r.position===2?'2':r.position===3?'3':'');
+  if(grade) grade.value=r.grade||'';
+  if(points) points.value=Number(r.points)||0;
+  resLookup();
+  document.getElementById('res-chest')?.scrollIntoView({behavior:'smooth',block:'center'});
+  toast('Result loaded for editing');
+}
+
+async function deleteResult(id){
+  const r=DB.results.find(x=>x.id===id);
+  if(!r) return;
+  const p=participant(r.participantId), e=event_(r.eventId);
+  if(!confirm(`Delete result for ${p?.name||'participant'} in ${e?.name||'event'}?`)) return;
+  const {error}=await sb.from('results').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete result');return;}
+  await loadRemoteDB(); render(); toast('Result deleted');
+}
+
+async function deleteAnnouncement(id){
+  const a=DB.announcements.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm(`Delete announcement "${a.title}"?`)) return;
+  const {error}=await sb.from('announcements').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete announcement');return;}
+  await loadRemoteDB(); render(); toast('Announcement deleted');
+}
+
+async function deleteContact(id){
+  const c=DB.committee.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`Delete contact "${c.name}"?`)) return;
+  const {error}=await sb.from('committee').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete contact');return;}
+  await loadRemoteDB(); render(); toast('Contact deleted');
+}
+
 /* ============================= SUPABASE BACKEND ============================= */
 const SUPABASE_URL = 'https://ygqdocutonsznbiriuht.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vlvmaG47HbaAaS7T3kteoQ_9bIa-yxP';
@@ -1699,9 +1808,9 @@ async function saveParticipant(ev,id){
 async function saveTeam(ev,id){
   ev.preventDefault(); const name=document.getElementById('tf-name').value.trim(), color=document.getElementById('tf-color').value;
   const leaderEl=document.getElementById('tf-leader');
-  const leaderId=leaderEl ? leaderEl.value : '';
+  const leaderIds=leaderEl ? Array.from(leaderEl.selectedOptions).map(o=>o.value).filter(Boolean) : [];
   const payload={name,color};
-  if(id) payload.leader_ids=leaderId?[leaderId]:[];
+  if(id) payload.leader_ids=leaderIds;
   const {error}=id?await sb.from('teams').update(payload).eq('id',id):await sb.from('teams').insert(payload);
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Team updated':'Team added');
 }
@@ -1713,7 +1822,7 @@ async function saveEvent(ev,id){
 }
 async function doSaveResult(){
   const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prize=document.getElementById('res-prize').value, grade=document.getElementById('res-grade').value||'';
-  const position=prize?Number(prize):0, points=Number(document.getElementById('res-points').value)||0;
+  const position=prize==='1ST'?1:prize==='2'?2:prize==='3'?3:0, points=Number(document.getElementById('res-points').value)||0;
   const p=DB.participants.find(x=>x.chest===chest); if(!p){toast('No participant with that chest number');return;}
   const payload={event_id:eid,participant_id:p.id,position,points,grade,prize};
   const {error}=await sb.from('results').upsert(payload,{onConflict:'event_id,participant_id'});
