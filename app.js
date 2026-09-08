@@ -41,6 +41,7 @@ let DB = {
   results:[],
   announcements:[],
   committee:[],
+  contacts:[],
   aboutContent:''
 };
 
@@ -116,7 +117,7 @@ const BOTTOM_TABS = [
 ];
 function renderBottomNav(){
   const active = ['home','events','results','leaderboard'].includes(STATE.route) ? STATE.route :
-    (['more','teams','team-detail','announcements','schedule','search','committee','admin','admin-dash','admin-participants','admin-teams','admin-events','admin-registrations','admin-results','admin-announcements','admin-committee','admin-about','admin-report','admin-management'].includes(STATE.route) ? 'more' : '');
+    (['more','teams','team-detail','announcements','schedule','search','committee','admin','admin-dash','admin-participants','admin-teams','admin-events','admin-registrations','admin-results','admin-announcements','admin-committee','admin-contact','admin-about','admin-report','admin-management'].includes(STATE.route) ? 'more' : '');
   document.getElementById('bottomnav-inner').innerHTML = BOTTOM_TABS.map(t=>`
     <a class="nav-item ${active===t.id?'active':''}" onclick="nav('${t.id}')">
       ${ic(t.icon,21)}<span>${t.label}</span>
@@ -124,6 +125,7 @@ function renderBottomNav(){
 }
 const SIDE_ITEMS = [
   {id:'committee', label:'Fest Committee', icon:'users'},
+  {id:'contact', label:'Contact Us', icon:'phone'},
   {id:'teams', label:'Teams', icon:'team'},
   {id:'announcements', label:'Announcements', icon:'megaphone'},
   {id:'schedule', label:'Schedule', icon:'calendar'},
@@ -141,12 +143,12 @@ function render(){
   const routes = {
     home: pageHome, events: pageEvents, 'event-details': pageEventDetails, results: pageResults, leaderboard: pageLeaderboard,
     more: pageMore, teams: pageTeams, 'team-detail': pageTeamDetail, announcements: pageAnnouncements,
-    schedule: pageSchedule, search: pageSearch, committee: pageCommittee, about: pageAbout,
+    schedule: pageSchedule, search: pageSearch, committee: pageCommittee, contact: pageContact, about: pageAbout,
     admin: pageAdminLogin, 'admin-dash': pageAdminDash,
     'admin-participants': pageAdminParticipants, 'admin-teams': pageAdminTeams,
     'admin-events': pageAdminEvents, 'admin-registrations': pageAdminRegistrations,
     'admin-results': pageAdminResults, 'admin-announcements': pageAdminAnnouncements,
-    'admin-committee': pageAdminCommittee, 'admin-about': pageAdminAbout, 'admin-report': pageAdminReport, 'admin-management': pageAdminManagement,
+    'admin-committee': pageAdminCommittee, 'admin-contact': pageAdminContact, 'admin-about': pageAdminAbout, 'admin-report': pageAdminReport, 'admin-management': pageAdminManagement,
   };
   const fn = routes[STATE.route] || pageHome;
   app.innerHTML = `<div class="page">${fn()}</div>`;
@@ -391,7 +393,7 @@ function pageMore(){
 }
 function moreDesc(id){
   return {teams:'Browse every participating team', announcements:'Latest fest updates', schedule:'Day-wise event timings',
-    search:'Find a participant by chest number', committee:'Meet the fest committee', about:'About this fest',
+    search:'Find a participant by chest number', committee:'Meet the fest committee', contact:'Contact the organizers', about:'About this fest',
     admin:'Organizer login & controls'}[id]||'';
 }
 
@@ -521,7 +523,7 @@ function pageAnnouncements(){
   `;
 }
 
-/* ============================= COMMITTEE ============================= */
+/* ============================= FEST COMMITTEE ============================= */
 function pageCommittee(){
   const list=[...DB.committee].sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0));
   return `
@@ -534,9 +536,28 @@ function pageCommittee(){
         ${contactPhoto(c)}
         <div style="flex:1;min-width:0;">
           <div class="cc-name">${esc(c.name)}</div>
+        </div>
+      </div>
+    </div>`).join('')}
+  `;
+}
+
+/* ============================= CONTACT US ============================= */
+function pageContact(){
+  const list=[...DB.contacts].sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0));
+  return `
+  ${backHead('Contact Us','more')}
+  <p class="page-sub">Contact the fest organizers.</p>
+  ${list.map(c=>`
+    <div class="card committee-card">
+      <div class="role">${esc(c.role)}</div>
+      <div class="cc-row">
+        ${contactPhoto(c)}
+        <div style="flex:1;min-width:0;">
+          <div class="cc-name">${esc(c.name)}</div>
           <div class="cc-phone">${ic('phone',13)} ${esc(c.phone)}</div>
         </div>
-        <a class="btn btn-primary" href="tel:${String(c.phone).replace(/[^+0-9]/g,'')}" style="padding:9px 12px;font-size:11px;">Call</a>
+        <a class="btn btn-primary" href="tel:${String(c.phone||'').replace(/[^+0-9]/g,'')}" style="padding:9px 12px;font-size:11px;">Call</a>
       </div>
     </div>`).join('')}
   `;
@@ -600,7 +621,7 @@ function pageAdminDash(){
   <div class="admin-grid">
     ${isSuperAdmin()?`${adminTile('admin-participants','users','Participants','Add & edit participants')}${adminTile('admin-teams','team','Teams','Manage teams & leaders')}${adminTile('admin-events','events','Events','Create & update events')}${adminTile('admin-registrations','check','Registrations','Register by chest no.')}`:''}
     ${adminTile('admin-results','award','Results','Enter event results')}${adminTile('admin-announcements','megaphone','Announcements','Publish updates')}${isSuperAdmin()?adminTile('admin-about','info','About Fest','Edit fest information'):''}
-    ${isSuperAdmin()?`${adminTile('admin-committee','phone','Contact Us','Manage contacts')}${adminTile('admin-report','doc','Final Report','Generate full report')}${adminTile('admin-management','shield','Admin Management','Add, edit & remove admins')}`:''}
+    ${isSuperAdmin()?`${adminTile('admin-committee','users','Fest Committee','Manage names, roles & photos')}${adminTile('admin-contact','phone','Contact Us','Manage names, roles, phones & photos')}${adminTile('admin-report','doc','Final Report','Generate full report')}${adminTile('admin-management','shield','Admin Management','Add, edit & remove admins')}`:''}
   </div>`);
 }
 function adminTile(route,icon,title,sub){ return `<a class="card admin-tile" onclick="nav('${route}')"><div class="ai">${ic(icon,18)}</div><b>${title}</b><span>${sub}</span></a>`; }
@@ -983,22 +1004,22 @@ function saveAnn(ev,id){
   closeModal(); render();
 }
 
-/* ============================= ADMIN: COMMITTEE ============================= */
+/* ============================= ADMIN: FEST COMMITTEE ============================= */
 function pageAdminCommittee(){
   return requireSuperAdmin(()=>{
     const list=[...DB.committee].sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0));
     return `
     ${backHead('Fest Committee','admin-dash')}
-    <p class="page-sub">Add committee profiles and drag them to change the public order.</p>
+    <p class="page-sub">Name, Role and Photo only. Drag profiles to change the public order.</p>
     <button class="btn btn-primary btn-block" style="margin-bottom:16px;" onclick="openCommForm()">${ic('plus',16)} Add Profile</button>
     <div id="committeeAdminList" class="drag-list">
     ${list.map(c=>`
       <div class="card committee-card drag-card" draggable="true" data-id="${c.id}" ondragstart="committeeDragStart(event)" ondragover="committeeDragOver(event)" ondrop="committeeDrop(event)" ondragend="committeeDragEnd(event)">
         <div class="a-top" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
           <div class="role">${esc(c.role)}</div><div class="drag-handle" title="Drag to reorder" onpointerdown="committeePointerStart(event)">↕</div>
-          <div class="row-actions"><button class="mini-btn" onclick="openCommForm('${c.id}')">Edit</button><button class="mini-btn danger" onclick="deleteContact('${c.id}')">Delete</button></div>
+          <div class="row-actions"><button class="mini-btn" onclick="openCommForm('${c.id}')">Edit</button><button class="mini-btn danger" onclick="deleteCommittee('${c.id}')">Delete</button></div>
         </div>
-        <div class="cc-row">${contactPhoto(c)}<div><div class="cc-name">${esc(c.name)}</div><div class="cc-phone">${ic('phone',13)} ${esc(c.phone)}</div></div></div>
+        <div class="cc-row">${contactPhoto(c)}<div><div class="cc-name">${esc(c.name)}</div></div></div>
       </div>`).join('')}
     </div>`;
   });
@@ -1051,17 +1072,83 @@ function openCommForm(id){
     <form onsubmit="saveComm(event,'${id||''}')">
       <div class="field"><label>Role</label><input id="cf-role" required value="${c?escAttr(c.role):''}"></div>
       <div class="field"><label>Name</label><input id="cf-name" required value="${c?escAttr(c.name):''}"></div>
-      <div class="field"><label>Phone Number</label><input id="cf-phone" required value="${c?escAttr(c.phone):'+91 '}"></div>
       <div class="field"><label>Photo (Optional)</label><input class="contact-photo-input" id="commPhoto" type="file" accept="image/*" onchange="previewContactPhoto(event)"><img id="commPhotoPreview" class="contact-photo-preview" src="${c&&c.photo?c.photo:''}" alt="Committee photo preview" style="display:${c&&c.photo?'block':'none'}"></div>
       <button class="btn btn-primary btn-block" type="submit">${ic('check',16)} Save Profile</button>
     </form>`);
 }
-function saveComm(ev,id){
+
+/* ============================= ADMIN: CONTACT US ============================= */
+function pageAdminContact(){
+  return requireSuperAdmin(()=>{
+    const list=[...DB.contacts].sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0));
+    return `
+    ${backHead('Contact Us','admin-dash')}
+    <p class="page-sub">Name, Role, Phone Number and Photo. Drag contacts to change the public order.</p>
+    <button class="btn btn-primary btn-block" style="margin-bottom:16px;" onclick="openContactForm()">${ic('plus',16)} Add Contact</button>
+    <div id="contactAdminList" class="drag-list">
+    ${list.map(c=>`
+      <div class="card committee-card drag-card contact-drag-card" draggable="true" data-id="${c.id}" ondragstart="contactDragStart(event)" ondragover="contactDragOver(event)" ondrop="contactDrop(event)" ondragend="contactDragEnd(event)">
+        <div class="a-top" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div class="role">${esc(c.role)}</div><div class="drag-handle" title="Drag to reorder" onpointerdown="contactPointerStart(event)">↕</div>
+          <div class="row-actions"><button class="mini-btn" onclick="openContactForm('${c.id}')">Edit</button><button class="mini-btn danger" onclick="deleteContact('${c.id}')">Delete</button></div>
+        </div>
+        <div class="cc-row">${contactPhoto(c)}<div><div class="cc-name">${esc(c.name)}</div><div class="cc-phone">${ic('phone',13)} ${esc(c.phone)}</div></div></div>
+      </div>`).join('')}
+    </div>`;
+  });
+}
+let contactDragId=null;
+function contactDragStart(ev){ contactDragId=ev.currentTarget.dataset.id; ev.currentTarget.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; ev.dataTransfer.setData('text/plain',contactDragId); }
+function contactDragOver(ev){ ev.preventDefault(); const card=ev.currentTarget; if(card.dataset.id!==contactDragId){ card.classList.add('drag-over'); } }
+function contactDragEnd(ev){ ev.currentTarget.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over')); }
+let contactPointerSource=null, contactPointerTarget=null;
+function contactPointerStart(ev){
+  const card=ev.currentTarget.closest('.contact-drag-card'); if(!card) return;
+  ev.preventDefault(); contactPointerSource=card; contactPointerTarget=null; card.classList.add('dragging');
+  ev.currentTarget.setPointerCapture?.(ev.pointerId);
+  const move=e=>{
+    if(!contactPointerSource) return;
+    const under=document.elementFromPoint(e.clientX,e.clientY)?.closest('.contact-drag-card');
+    document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+    if(under && under!==contactPointerSource){ under.classList.add('drag-over'); contactPointerTarget=under; }
+  };
+  const up=async e=>{
+    document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up);
+    const source=contactPointerSource, target=contactPointerTarget; contactPointerSource=null; contactPointerTarget=null;
+    source?.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+    if(source&&target) await contactReorder(source.dataset.id,target.dataset.id);
+  };
+  document.addEventListener('pointermove',move,{passive:false}); document.addEventListener('pointerup',up,{once:true});
+}
+async function contactReorder(sourceId,targetId){
+  if(!sourceId || !targetId || sourceId===targetId) return;
+  const list=[...DB.contacts].sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0));
+  const from=list.findIndex(x=>x.id===sourceId), to=list.findIndex(x=>x.id===targetId); if(from<0||to<0) return;
+  const [moved]=list.splice(from,1); list.splice(to,0,moved);
+  try{
+    const updates=list.map((c,i)=>sb.from('contacts').update({sort_order:i}).eq('id',c.id));
+    const results=await Promise.all(updates); const failed=results.find(r=>r.error); if(failed?.error) throw failed.error;
+    await loadRemoteDB(); render(); toast('Contact order updated');
+  }catch(e){sbToastError(e,'Could not update contact order');}
+}
+async function contactDrop(ev){
   ev.preventDefault();
-  const role=document.getElementById('cf-role').value.trim(), name=document.getElementById('cf-name').value.trim(), phone=document.getElementById('cf-phone').value.trim();
-  if(id){ const c=DB.committee.find(x=>x.id===id); c.role=role; c.name=name; c.phone=phone; if(pendingContactPhoto) c.photo=pendingContactPhoto; else delete c.photo; toast('Committee profile updated'); }
-  else { const maxOrder=DB.committee.reduce((m,c)=>Math.max(m,Number(c.sortOrder)||0),-1); const item={id:uid('c'),role,name,phone,sortOrder:maxOrder+1}; if(pendingContactPhoto) item.photo=pendingContactPhoto; DB.committee.push(item); toast('Committee profile added'); }
-  pendingContactPhoto=""; closeModal(); render();
+  const target=ev.currentTarget, targetId=target.dataset.id, sourceId=contactDragId || ev.dataTransfer.getData('text/plain');
+  document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+  await contactReorder(sourceId,targetId);
+}
+function openContactForm(id){
+  const c = id ? DB.contacts.find(x=>x.id===id) : null;
+  pendingContactPhoto = c && c.photo ? c.photo : "";
+  openModal(`
+    <div class="modal-head"><h3>${c?'Edit Contact':'Add Contact'}</h3><button class="icon-btn" onclick="closeModal()">${ic('x',16)}</button></div>
+    <form onsubmit="saveContact(event,'${id||''}')">
+      <div class="field"><label>Role</label><input id="ct-role" required value="${c?escAttr(c.role):''}"></div>
+      <div class="field"><label>Name</label><input id="ct-name" required value="${c?escAttr(c.name):''}"></div>
+      <div class="field"><label>Phone Number</label><input id="ct-phone" required value="${c?escAttr(c.phone):'+91 '}" inputmode="tel"></div>
+      <div class="field"><label>Photo (Optional)</label><input class="contact-photo-input" id="contactPhoto" type="file" accept="image/*" onchange="previewContactPhoto(event)"><img id="contactPhotoPreview" class="contact-photo-preview" src="${c&&c.photo?c.photo:''}" alt="Contact photo preview" style="display:${c&&c.photo?'block':'none'}"></div>
+      <button class="btn btn-primary btn-block" type="submit">${ic('check',16)} Save Contact</button>
+    </form>`);
 }
 
 /* ============================= ADMIN: ABOUT FEST ============================= */
@@ -1218,15 +1305,23 @@ async function deleteAnnouncement(id){
   await loadRemoteDB(); render(); toast('Announcement deleted');
 }
 
-async function deleteContact(id){
+async function deleteCommittee(id){
   const c=DB.committee.find(x=>x.id===id);
   if(!c) return;
-  if(!confirm(`Delete contact "${c.name}"?`)) return;
+  if(!confirm(`Delete committee profile "${c.name}"?`)) return;
   const {error}=await sb.from('committee').delete().eq('id',id);
+  if(error){sbToastError(error,'Could not delete committee profile');return;}
+  await loadRemoteDB(); render(); toast('Committee profile deleted');
+}
+
+async function deleteContact(id){
+  const c=DB.contacts.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`Delete contact "${c.name}"?`)) return;
+  const {error}=await sb.from('contacts').delete().eq('id',id);
   if(error){sbToastError(error,'Could not delete contact');return;}
   await loadRemoteDB(); render(); toast('Contact deleted');
 }
-
 /* ============================= SUPABASE BACKEND ============================= */
 const SUPABASE_URL = 'https://ygqdocutonsznbiriuht.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vlvmaG47HbaAaS7T3kteoQ_9bIa-yxP';
@@ -1245,16 +1340,32 @@ async function sbLoadTable(table, order='created_at'){
   return data||[];
 }
 async function loadRemoteDB(){
-  const [events,teams,participants,results,announcements,committee,registrations,aboutRows]=await Promise.all([
-    sbLoadTable('events'), sbLoadTable('teams'), sbLoadTable('participants'), sbLoadTable('results'),
-    sbLoadTable('announcements','date'), sbLoadTable('committee','sort_order'), sbLoadTable('registrations'), sbLoadTable('about_fest')
-  ]);
+  // Load each public table independently so an optional/new table or policy
+  // cannot make the entire public app report a backend failure.
+  const names=[
+    ['events','created_at'],['teams','created_at'],['participants','created_at'],['results','created_at'],
+    ['announcements','date'],['committee','sort_order'],['contacts','sort_order'],['registrations','created_at'],['about_fest','updated_at']
+  ];
+  const settled=await Promise.all(names.map(async ([table,order])=>{
+    try{ return {table,data:await sbLoadTable(table,order),error:null}; }
+    catch(error){ console.error(`Supabase load failed: ${table}`,error); return {table,data:[],error}; }
+  }));
+  const get=(table)=>settled.find(x=>x.table===table)||{data:[],error:null};
+  const core=['events','teams','participants','results'];
+  const coreErrors=settled.filter(x=>core.includes(x.table)&&x.error);
+  if(coreErrors.length) throw coreErrors[0].error;
+
+  const events=get('events').data, teams=get('teams').data, participants=get('participants').data, results=get('results').data;
+  const announcements=get('announcements').data, committee=get('committee').data, contacts=get('contacts').data;
+  const registrations=get('registrations').data, aboutRows=get('about_fest').data;
+
   DB.events=events.map(e=>({id:e.id,name:e.name,date:e.event_date||'',time:e.event_time||'',status:e.status||'UPCOMING',details:e.details||'',venue:e.venue||''}));
   DB.teams=teams.map(t=>({id:t.id,name:t.name,color:t.color||'#d91f26',leaderIds:Array.isArray(t.leader_ids)?t.leader_ids:[]}));
   DB.participants=participants.map(p=>({id:p.id,name:p.name,chest:p.chest||'',teamId:p.team_id,points:Number(p.points)||0,phone:p.phone||''}));
   DB.results=results.map(r=>({id:r.id,eventId:r.event_id,position:Number(r.position)||0,participantId:r.participant_id,points:Number(r.points)||0,grade:r.grade||'',prize:r.prize||''}));
   DB.announcements=announcements.map(a=>({id:a.id,title:a.title,message:a.message||'',date:a.date}));
-  DB.committee=committee.map(c=>({id:c.id,role:c.role,name:c.name,phone:c.phone,photo:c.photo||'',sortOrder:Number(c.sort_order)||0}));
+  DB.committee=committee.map(c=>({id:c.id,role:c.role,name:c.name,photo:c.photo||'',sortOrder:Number(c.sort_order)||0}));
+  DB.contacts=contacts.map(c=>({id:c.id,role:c.role,name:c.name,phone:c.phone||'',photo:c.photo||'',sortOrder:Number(c.sort_order)||0}));
   DB.aboutContent=aboutRows.find(a=>a.id==='main')?.content||'';
   window._registrations=registrations.map(r=>({id:r.id,eid:r.event_id,pid:r.participant_id}));
   recalc();
@@ -1323,15 +1434,18 @@ async function saveAnn(ev,id){
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Announcement updated':'Announcement published');
 }
 async function saveComm(ev,id){
-  ev.preventDefault();
-  const role=document.getElementById('cf-role').value.trim();
-  const name=document.getElementById('cf-name').value.trim();
-  // Fest Committee intentionally has no phone field.
-  // Keep the legacy DB column non-null compatible without exposing/editing it.
+  ev.preventDefault(); const role=document.getElementById('cf-role').value.trim(), name=document.getElementById('cf-name').value.trim();
   const payload={role,name,phone:'',photo:pendingContactPhoto||null};
   if(!id) payload.sort_order=DB.committee.reduce((m,c)=>Math.max(m,Number(c.sortOrder)||0),-1)+1;
   const {error}=id?await sb.from('committee').update(payload).eq('id',id):await sb.from('committee').insert(payload);
   if(error){sbToastError(error);return;} pendingContactPhoto=''; closeModal(); await loadRemoteDB(); render(); toast(id?'Committee profile updated':'Committee profile added');
+}
+async function saveContact(ev,id){
+  ev.preventDefault(); const role=document.getElementById('ct-role').value.trim(), name=document.getElementById('ct-name').value.trim(), phone=document.getElementById('ct-phone').value.trim();
+  const payload={role,name,phone,photo:pendingContactPhoto||null};
+  if(!id) payload.sort_order=DB.contacts.reduce((m,c)=>Math.max(m,Number(c.sortOrder)||0),-1)+1;
+  const {error}=id?await sb.from('contacts').update(payload).eq('id',id):await sb.from('contacts').insert(payload);
+  if(error){sbToastError(error);return;} pendingContactPhoto=''; closeModal(); await loadRemoteDB(); render(); toast(id?'Contact updated':'Contact added');
 }
 async function doRegister(){
   const eid=document.getElementById('reg-event').value, chest=document.getElementById('reg-chest').value.trim(), p=DB.participants.find(x=>x.chest===chest);

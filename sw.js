@@ -1,4 +1,4 @@
-const CACHE_NAME = 'democrazy-fest-v2';
+const CACHE_NAME = 'democrazy-fest-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -21,9 +21,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
   );
@@ -33,23 +31,28 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Never cache Supabase/API/realtime requests.
+  // Supabase/API/realtime must always go to the network.
   if (
     url.origin !== self.location.origin ||
     url.hostname.includes('supabase.co') ||
     url.pathname.includes('/rest/') ||
     url.pathname.includes('/auth/') ||
     url.pathname.includes('/functions/')
-  ) {
-    return;
-  }
+  ) return;
 
   if (request.method !== 'GET') return;
+
+  // Always get the latest JS so deployments are not hidden by an old cache.
+  if (url.pathname === '/app.js') {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' }).catch(() => caches.match(request))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
-
       return fetch(request).then(response => {
         if (response && response.ok && response.type === 'basic') {
           const copy = response.clone();
