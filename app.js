@@ -456,41 +456,63 @@ function pageTeamDetail(){
 
 /* ============================= SEARCH ============================= */
 function pageSearch(){
-  const chest = STATE.params.chest || '';
-  const found = chest ? DB.participants.find(p=>p.chest===chest.trim()) : null;
-  const res = found ? DB.results.filter(r=>r.participantId===found.id).sort((a,b)=>{const ea=event_(a.eventId), eb=event_(b.eventId); return ((eb?.date||'')+(eb?.time||'')).localeCompare((ea?.date||'')+(ea?.time||''));}) : [];
+  const q = String(STATE.params.q || STATE.params.chest || '').trim();
+  const qLower = q.toLowerCase();
+  const found = q ? DB.participants.find(p => String(p.chest||'').toLowerCase() === qLower || String(p.name||'').toLowerCase().includes(qLower)) : null;
+  const res = found ? DB.results.filter(r=>r.participantId===found.id).sort((a,b)=>{
+    const ea=event_(a.eventId), eb=event_(b.eventId);
+    return ((eb?.date||'')+(eb?.time||'')).localeCompare((ea?.date||'')+(ea?.time||''));
+  }) : [];
+  const regs = found ? (window._registrations||[]).filter(r=>r.pid===found.id).sort((a,b)=>{
+    const ea=event_(a.eid), eb=event_(b.eid);
+    return ((eb?.date||'')+(eb?.time||'')).localeCompare((ea?.date||'')+(ea?.time||''));
+  }) : [];
+  const resultEventIds = new Set(res.map(r=>r.eventId));
   return `
   ${backHead('Search Participant','more')}
   <div class="searchbar">
     ${ic('search',18)}
-    <input id="chestInput" placeholder="Enter chest number, e.g. 101" value="${chest}" inputmode="numeric" onkeydown="if(event.key==='Enter')doSearch()">
+    <input id="chestInput" placeholder="Enter name or chest number" value="${esc(q)}" onkeydown="if(event.key==='Enter')doSearch()">
     <button class="btn btn-primary btn-sm" onclick="doSearch()">Search</button>
   </div>
-  ${!chest ? `<div class="empty">${ic('search',36)}<b>Search by chest number</b>Find a participant's team and results instantly.</div>` :
-    !found ? `<div class="empty">${ic('search',36)}<b>No participant found</b>Check the chest number and try again.</div>` :
+  ${!q ? `<div class="empty">${ic('search',36)}<b>Search Participant</b>Search by participant name or chest number.</div>` :
+    !found ? `<div class="empty">${ic('search',36)}<b>No participant found</b>Check the name or chest number and try again.</div>` :
     `<div class="card" style="padding:18px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">
       <div class="avatar" style="width:52px;height:52px;font-size:16px;">${initials(found.name)}</div>
-      <div><div style="font-weight:700;font-size:15px;">${found.name}</div>
-      <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${found.chest} · ${team(found.teamId)?.name}</div>
-      <div style="margin-top:6px;"><span class="chip chip-upcoming">${found.points} total points</span></div></div>
+      <div style="min-width:0;"><div style="font-weight:700;font-size:15px;">${esc(found.name)}</div>
+      <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${esc(found.chest)} · ${esc(team(found.teamId)?.name||'')}</div>
+      <div style="margin-top:6px;"><span class="chip chip-upcoming">${found.points||0} total points</span></div></div>
     </div>
+
     <div class="section-head"><h2>Results</h2></div>
-    ${res.length? res.map(r=>{
+    ${res.length ? res.map(r=>{
       const ev=event_(r.eventId);
-      return `<div class="podium-row p${r.position}">
-        <div class="medal ${medalIcon(r.position)}">${medalLabel(r.position)}</div>
-        <div class="rank-info"><div class="name">${ev.name}</div></div>
-        <div class="rank-pts"><b>${r.points}</b><small>pts</small></div>
+      return `<div class="podium-row p${r.position||0}">
+        <div class="medal ${medalIcon(r.position)}">${r.position?medalLabel(r.position):'—'}</div>
+        <div class="rank-info"><div class="name">${esc(ev?.name||'Event')}</div>
+          <div class="sub">${r.position?esc(medalLabel(r.position)):'NO PRIZE'} · ${esc(r.grade||'NO GRADE')}</div></div>
+        <div class="rank-pts"><b>${r.points||0}</b><small>pts</small></div>
       </div>`;
     }).join('') : `<div class="empty">No results yet for this participant.</div>`}
+
+    <div class="section-head" style="margin-top:22px;"><h2>Participated Events</h2></div>
+    ${regs.length ? regs.map(r=>{
+      const ev=event_(r.eid);
+      const status = resultEventIds.has(r.eid) ? 'Result Published' : 'Registered';
+      return `<div class="rank-row" style="cursor:pointer;" onclick="nav('event-details',{id:'${r.eid}'})">
+        <div class="avatar" style="font-size:10px;">${ev?.date ? fmtDate(ev.date) : '—'}</div>
+        <div class="rank-info"><div class="name">${esc(ev?.name||'Event')}</div>
+          <div class="sub">${ev?.venue ? esc(ev.venue) : 'Participated event'}</div></div>
+        <span class="chip ${resultEventIds.has(r.eid)?'chip-live':'chip-upcoming'}">${status}</span>
+      </div>`;
+    }).join('') : `<div class="empty">No participated events found.</div>`}
     `}
   `;
 }
 function doSearch(){
-  const v=document.getElementById('chestInput').value;
-  nav('search',{chest:v});
+  const v=document.getElementById('chestInput').value.trim();
+  nav('search',{q:v});
 }
-
 /* ============================= SCHEDULE ============================= */
 function pageSchedule(){
   const byDate = {};
