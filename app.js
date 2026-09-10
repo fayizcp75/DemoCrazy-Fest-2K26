@@ -196,7 +196,7 @@ function pageHome(){
   const now=Date.now();
   if(!document.getElementById('home-countdown-style')){
     const st=document.createElement('style'); st.id='home-countdown-style'; st.textContent=`
-      .home-live-events{display:grid;gap:10px;margin-top:12px}.home-live-event{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.035)}.home-live-event h3{margin:0;font-size:18px}.live-dot{width:8px;height:8px;border-radius:50%;background:#ff3b30;box-shadow:0 0 12px rgba(255,59,48,.7);flex:none}.countdown-card{overflow:hidden}.home-countdown{margin-top:14px;font-size:clamp(24px,6vw,36px);font-weight:800;letter-spacing:1.5px;font-variant-numeric:tabular-nums}.countdown-labels{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:4px;color:var(--text-dim);font-size:8px;letter-spacing:1.2px}.countdown-labels span{text-align:center}
+      .home-live-events{display:grid;gap:10px;margin-top:12px}.home-live-event{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.035)}.home-live-event h3{margin:0;font-size:18px}.live-dot{width:8px;height:8px;border-radius:50%;background:#ff3b30;box-shadow:0 0 12px rgba(255,59,48,.7);flex:none}.countdown-card{overflow:hidden;height:185px;min-height:185px;box-sizing:border-box}.home-live-next-grid>.home-live-next-card{height:185px}.home-countdown{margin-top:12px;font-size:clamp(18px,4.2vw,24px);font-weight:800;letter-spacing:1px;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}.countdown-labels{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:5px;color:var(--text-dim);font-size:7px;letter-spacing:1px}.countdown-labels span{text-align:center}
     `; document.head.appendChild(st);
   }
   const liveEvents = DB.events.filter(e=>e.status==='LIVE').sort((a,b)=>eventStartMs(a)-eventStartMs(b));
@@ -218,7 +218,7 @@ function pageHome(){
   <p class="page-sub" style="margin-bottom:16px;">Welcome back — here's what's happening right now.</p>
 
   <div class="home-live-next-grid">
-    <div>
+    <div class="home-live-next-card">
       <div class="section-head home-card-head"><div><div class="eyebrow">Live now</div><h2>Live</h2></div></div>
       ${liveEvents.length ? `
       <div class="hero-live">
@@ -227,7 +227,7 @@ function pageHome(){
       </div>` : `<div class="hero-none">No event is live right now — check Events for what's next.</div>`}
     </div>
 
-    <div>
+    <div class="home-live-next-card">
       <div class="section-head home-card-head"><div><div class="eyebrow">Coming up</div><h2>Next Event</h2></div><a class="link-more" onclick="nav('events')">View All ${ic('chevronR',14)}</a></div>
       ${upcoming ? `
       <div class="hero-live next-as-live countdown-card">
