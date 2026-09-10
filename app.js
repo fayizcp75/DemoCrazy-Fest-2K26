@@ -182,11 +182,10 @@ function pageHome(){
       <div class="section-head home-card-head"><div><div class="eyebrow">Live now</div><h2>Live</h2></div></div>
       ${liveEvents.length ? `
       <div class="hero-live">
-        <div class="eyebrow-row">${statusChip('LIVE')}<span style="font-size:11px;color:var(--text-dim);">${liveEvents.length} event${liveEvents.length>1?'s':''}</span></div>
+        <div class="eyebrow-row">${statusChip('LIVE')}</div>
         ${liveEvents.map((e,i)=>`
-          <div style="${i?'margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);':''}">
+          <div style="${i?'margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);':''}">
             <h3>${e.name}</h3>
-            <p>In progress · started ${fmtTime(e.time)} today</p>
           </div>
         `).join('')}
       </div>` : `<div class="hero-none">No event is live right now — check Events for what's next.</div>`}
