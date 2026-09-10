@@ -152,15 +152,55 @@ function render(){
   };
   const fn = routes[STATE.route] || pageHome;
   app.innerHTML = `<div class="page">${fn()}</div>`;
+  if(STATE.route==='home') startHomeCountdown(); else clearInterval(HOME_COUNTDOWN_TIMER);
 }
 function backHead(title, to){
   return `<div class="subpage-head"><button class="icon-btn" onclick="nav('${to}')">${ic('back',18)}</button><h1>${title}</h1></div>`;
 }
 
 /* ============================= HOME ============================= */
+let HOME_COUNTDOWN_TIMER=null;
+function eventStartMs(e){
+  if(!e || !e.date || !e.time) return NaN;
+  return new Date(`${e.date}T${e.time}:00`).getTime();
+}
+function formatCountdown(ms){
+  const total=Math.max(0,Math.floor(ms/1000));
+  const d=Math.floor(total/86400);
+  const h=Math.floor((total%86400)/3600);
+  const m=Math.floor((total%3600)/60);
+  const sec=total%60;
+  return {d,h,m,sec};
+}
+function countdownText(ms){
+  const c=formatCountdown(ms);
+  return `${String(c.d).padStart(2,'0')} : ${String(c.h).padStart(2,'0')} : ${String(c.m).padStart(2,'0')} : ${String(c.sec).padStart(2,'0')}`;
+}
+function startHomeCountdown(){
+  clearInterval(HOME_COUNTDOWN_TIMER);
+  HOME_COUNTDOWN_TIMER=setInterval(()=>{
+    const el=document.getElementById('home-next-countdown');
+    if(!el) return;
+    const id=el.dataset.eventId;
+    const e=event_(id);
+    const ms=eventStartMs(e)-Date.now();
+    if(!e || !Number.isFinite(ms) || ms<=0){
+      clearInterval(HOME_COUNTDOWN_TIMER);
+      refreshRemote();
+      return;
+    }
+    el.textContent=countdownText(ms);
+  },1000);
+}
 function pageHome(){
-  const live = DB.events.find(e=>e.status==='LIVE');
-  const upcoming = DB.events.filter(e=>e.status==='UPCOMING').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
+  const now=Date.now();
+  if(!document.getElementById('home-countdown-style')){
+    const st=document.createElement('style'); st.id='home-countdown-style'; st.textContent=`
+      .home-live-events{display:grid;gap:10px;margin-top:12px}.home-live-event{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.035)}.home-live-event h3{margin:0;font-size:18px}.live-dot{width:8px;height:8px;border-radius:50%;background:#ff3b30;box-shadow:0 0 12px rgba(255,59,48,.7);flex:none}.countdown-card{overflow:hidden}.home-countdown{margin-top:14px;font-size:clamp(24px,6vw,36px);font-weight:800;letter-spacing:1.5px;font-variant-numeric:tabular-nums}.countdown-labels{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:4px;color:var(--text-dim);font-size:8px;letter-spacing:1.2px}.countdown-labels span{text-align:center}
+    `; document.head.appendChild(st);
+  }
+  const liveEvents = DB.events.filter(e=>e.status==='LIVE').sort((a,b)=>eventStartMs(a)-eventStartMs(b));
+  const upcoming = DB.events.filter(e=>e.status==='UPCOMING' && Number.isFinite(eventStartMs(e)) && eventStartMs(e)>now).sort((a,b)=>eventStartMs(a)-eventStartMs(b))[0];
   const topTeams = rankedTeams().slice(0,3);
   const topParts = rankedParticipants().slice(0,3);
   const latest = DB.results.slice().reverse().slice(0,3);
@@ -180,21 +220,21 @@ function pageHome(){
   <div class="home-live-next-grid">
     <div>
       <div class="section-head home-card-head"><div><div class="eyebrow">Live now</div><h2>Live</h2></div></div>
-      ${live ? `
+      ${liveEvents.length ? `
       <div class="hero-live">
-        <div class="eyebrow-row">${statusChip('LIVE')}<span style="font-size:11px;color:var(--text-dim);">Main Stage</span></div>
-        <h3>${live.name}</h3>
-        <p>In progress · started ${fmtTime(live.time)} today</p>
+        <div class="eyebrow-row">${statusChip('LIVE')}<span style="font-size:11px;color:var(--text-dim);">${liveEvents.length} ${liveEvents.length===1?'Event':'Events'} Live</span></div>
+        <div class="home-live-events">${liveEvents.map(e=>`<div class="home-live-event"><span class="live-dot"></span><h3>${e.name}</h3></div>`).join('')}</div>
       </div>` : `<div class="hero-none">No event is live right now — check Events for what's next.</div>`}
     </div>
 
     <div>
-      <div class="section-head home-card-head"><div><div class="eyebrow">Coming up</div><h2>Next</h2></div><a class="link-more" onclick="nav('events')">View All ${ic('chevronR',14)}</a></div>
+      <div class="section-head home-card-head"><div><div class="eyebrow">Coming up</div><h2>Next Event</h2></div><a class="link-more" onclick="nav('events')">View All ${ic('chevronR',14)}</a></div>
       ${upcoming ? `
-      <div class="hero-live next-as-live">
-        <div class="eyebrow-row">${statusChip('UPCOMING')}<span style="font-size:11px;color:var(--text-dim);">${fmtDate(upcoming.date)}</span></div>
+      <div class="hero-live next-as-live countdown-card">
+        <div class="eyebrow-row">${statusChip('UPCOMING')}<span style="font-size:11px;color:var(--text-dim);">${fmtDate(upcoming.date)} · ${fmtTime(upcoming.time)}</span></div>
         <h3>${upcoming.name}</h3>
-        <p>${ic('clock',14)} ${fmtTime(upcoming.time)}</p>
+        <div id="home-next-countdown" data-event-id="${upcoming.id}" class="home-countdown">${countdownText(eventStartMs(upcoming)-now)}</div>
+        <div class="countdown-labels"><span>DAYS</span><span>HOURS</span><span>MIN</span><span>SEC</span></div>
       </div>` : `<div class="hero-none">No upcoming event.</div>`}
     </div>
   </div>
