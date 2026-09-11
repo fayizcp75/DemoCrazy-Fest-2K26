@@ -4,6 +4,28 @@ function contactPhoto(c){
     : `<div class="cc-avatar">${initials(c.name)}</div>`;
 }
 
+/* ============================= DEMO CRAZY SPLASH ============================= */
+(function(){
+  try {
+    if (document.getElementById('dcSplash')) return;
+    const splash=document.createElement('div');
+    splash.id='dcSplash';
+    splash.innerHTML='<img src="/icons/icon-512.png" alt="DEMO CRAZY">';
+    const style=document.createElement('style');
+    style.textContent=`
+      #dcSplash{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:#050505;opacity:1;transition:opacity .45s ease;pointer-events:auto}
+      #dcSplash img{width:min(58vw,280px);height:min(58vw,280px);object-fit:contain;display:block}
+      #dcSplash.dc-hide{opacity:0;pointer-events:none}
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(splash);
+    window.setTimeout(function(){
+      splash.classList.add('dc-hide');
+      window.setTimeout(function(){splash.remove();style.remove();},500);
+    },1400);
+  } catch(e) {}
+})();
+
 /* ============================= ICONS ============================= */
 const ICONS = {
   home:'<path d="M4 11L12 4L20 11V19A1 1 0 0 1 19 20H15V14H9V20H5A1 1 0 0 1 4 19V11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
