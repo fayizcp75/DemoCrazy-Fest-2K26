@@ -161,34 +161,6 @@ function backHead(title, to){
 }
 
 /* ============================= HOME ============================= */
-function globalSearchMarkup(){
-  return `
-  <div class="home-global-search" style="margin:0 0 22px;position:relative;">
-    <div class="searchbar" style="margin-bottom:0;">
-      ${ic('search',18)}
-      <input id="homeGlobalSearchInput" placeholder="Search participant, chest no., event or team..." autocomplete="off" oninput="liveGlobalSearch(this.value)">
-    </div>
-    <div id="homeGlobalSearchResults" style="margin-top:8px;"></div>
-  </div>`;
-}
-function renderGlobalSearchResults(value){
-  const q=String(value||'').trim().toLowerCase();
-  if(!q) return '';
-  const participants=DB.participants.filter(p=>String(p.name||'').toLowerCase().includes(q)||String(p.chest||'').toLowerCase().includes(q)).slice(0,5);
-  const events=DB.events.filter(e=>String(e.name||'').toLowerCase().includes(q)).slice(0,5);
-  const teams=DB.teams.filter(t=>String(t.name||'').toLowerCase().includes(q)).slice(0,5);
-  if(!participants.length&&!events.length&&!teams.length) return `<div class="empty" style="margin-top:0;"><b>No results found</b>Try a participant name, chest number, event or team.</div>`;
-  return `<div class="card" style="padding:8px;margin:0;">
-    ${participants.length?`<div class="eyebrow" style="padding:8px 10px 4px;">Participants</div>${participants.map(p=>`<div class="rank-row" style="margin:4px 0;cursor:pointer;" onclick="nav('search',{q:'${escAttr(p.name)}'})"><div class="avatar">${initials(p.name)}</div><div class="rank-info"><div class="name">${esc(p.name)}</div><div class="sub">#${esc(p.chest)} · ${esc(team(p.teamId)?.name||'—')}</div></div></div>`).join('')}`:''}
-    ${events.length?`<div class="eyebrow" style="padding:10px 10px 4px;">Events</div>${events.map(e=>`<div class="rank-row" style="margin:4px 0;cursor:pointer;" onclick="nav('event-details',{id:'${e.id}'})"><div class="avatar">${ic('events',18)}</div><div class="rank-info"><div class="name">${esc(e.name)}</div><div class="sub">${esc(e.status||'')}</div></div></div>`).join('')}`:''}
-    ${teams.length?`<div class="eyebrow" style="padding:10px 10px 4px;">Teams</div>${teams.map(t=>`<div class="rank-row" style="margin:4px 0;cursor:pointer;" onclick="nav('team-detail',{id:'${t.id}'})"><div class="avatar">${ic('team',18)}</div><div class="rank-info"><div class="name">${esc(t.name)}</div><div class="sub">${DB.participants.filter(p=>p.teamId===t.id).length} members</div></div></div>`).join('')}`:''}
-  </div>`;
-}
-function liveGlobalSearch(value){
-  const box=document.getElementById('homeGlobalSearchResults');
-  if(box) box.innerHTML=renderGlobalSearchResults(value);
-}
-
 function pageHome(){
   const live = DB.events.find(e=>e.status==='LIVE');
   const upcoming = DB.events.filter(e=>e.status==='UPCOMING').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
@@ -206,7 +178,6 @@ function pageHome(){
     .slice(0,6) : [];
 
   return `
-  ${globalSearchMarkup()}
   <p class="page-sub" style="margin-bottom:16px;">Welcome back — here's what's happening right now.</p>
 
   <div class="home-live-next-grid">
@@ -587,7 +558,7 @@ function renderParticipantSearchResults(q){
     <div class="section-head"><h2>Participated Events</h2></div>
     ${events.length ? events.map(ev=>{
       const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
-      return `<div class="rank-row">
+      return `<div class="rank-row" onclick="nav('event-details',{eventId:'${ev.id}'})" style="cursor:pointer;">
         <div class="medal ${r&&r.position?medalIcon(r.position):''}">${r&&r.position?medalLabel(r.position):'—'}</div>
         <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? esc(r.grade||'NO GRADE') : 'NO GRADE'}</div></div>
         <div class="rank-pts"><b>${r ? Number(r.points)||0 : 0}</b><small>PTS</small></div>
