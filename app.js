@@ -85,7 +85,7 @@ function medalIcon(pos){return pos===1?'g':pos===2?'s':'b';}
 function medalLabel(pos){return pos===1?'1st':pos===2?'2nd':'3rd';}
 
 /* ============================= STATE / ROUTER ============================= */
-let STATE = {route:'home', params:{}, adminLoggedIn:false, resultsTab:null, leaderboardTab:'teams', regEventId:null};
+let STATE = {route:'home', params:{}, adminLoggedIn:false, resultsTab:null, leaderboardTab:'teams'};
 
 function nav(route, params={}){
   STATE.route = route; STATE.params = params;
@@ -159,7 +159,7 @@ function backHead(title, to){
 
 /* ============================= HOME ============================= */
 function pageHome(){
-  const liveEvents = DB.events.filter(e=>e.status==='LIVE').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const live = DB.events.find(e=>e.status==='LIVE');
   const upcoming = DB.events.filter(e=>e.status==='UPCOMING').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
   const topTeams = rankedTeams().slice(0,3);
   const topParts = rankedParticipants().slice(0,3);
@@ -180,14 +180,11 @@ function pageHome(){
   <div class="home-live-next-grid">
     <div>
       <div class="section-head home-card-head"><div><div class="eyebrow">Live now</div><h2>Live</h2></div></div>
-      ${liveEvents.length ? `
+      ${live ? `
       <div class="hero-live">
-        <div class="eyebrow-row">${statusChip('LIVE')}</div>
-        ${liveEvents.map((e,i)=>`
-          <div style="${i?'margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);':''}">
-            <h3>${e.name}</h3>
-          </div>
-        `).join('')}
+        <div class="eyebrow-row">${statusChip('LIVE')}<span style="font-size:11px;color:var(--text-dim);">Main Stage</span></div>
+        <h3>${live.name}</h3>
+        <p>In progress · started ${fmtTime(live.time)} today</p>
       </div>` : `<div class="hero-none">No event is live right now — check Events for what's next.</div>`}
     </div>
 
@@ -459,50 +456,39 @@ function pageTeamDetail(){
 
 /* ============================= SEARCH ============================= */
 function pageSearch(){
-  const q = String(STATE.params.q || STATE.params.chest || '').trim();
-  const found = q ? DB.participants.find(p => String(p.chest||'').toLowerCase()===q.toLowerCase() || String(p.name||'').toLowerCase()===q.toLowerCase()) : null;
-  const registrations = found ? (window._registrations||[]).filter(r=>r.pid===found.id) : [];
-  const participated = registrations.map(r=>{
-    const ev=event_(r.eid);
-    const result=DB.results.find(x=>x.eventId===r.eid && x.participantId===found.id);
-    return {ev,result};
-  }).filter(x=>x.ev).sort((a,b)=>((a.ev.date||'')+(a.ev.time||'')).localeCompare((b.ev.date||'')+(b.ev.time||'')));
+  const chest = STATE.params.chest || '';
+  const found = chest ? DB.participants.find(p=>p.chest===chest.trim()) : null;
+  const res = found ? DB.results.filter(r=>r.participantId===found.id).sort((a,b)=>{const ea=event_(a.eventId), eb=event_(b.eventId); return ((eb?.date||'')+(eb?.time||'')).localeCompare((ea?.date||'')+(ea?.time||''));}) : [];
   return `
   ${backHead('Search Participant','more')}
   <div class="searchbar">
     ${ic('search',18)}
-    <input id="chestInput" placeholder="Enter chest number or name" value="${esc(q)}" onkeydown="if(event.key==='Enter')doSearch()">
+    <input id="chestInput" placeholder="Enter chest number, e.g. 101" value="${chest}" inputmode="numeric" onkeydown="if(event.key==='Enter')doSearch()">
     <button class="btn btn-primary btn-sm" onclick="doSearch()">Search</button>
   </div>
-  ${!q ? `<div class="empty">${ic('search',36)}<b>Search participant</b>Find a participant's events and results.</div>` :
-    !found ? `<div class="empty">${ic('search',36)}<b>No participant found</b>Check the chest number or name and try again.</div>` :
-    `<div class="card" style="padding:18px;margin-bottom:22px;display:flex;align-items:center;gap:14px;">
+  ${!chest ? `<div class="empty">${ic('search',36)}<b>Search by chest number</b>Find a participant's team and results instantly.</div>` :
+    !found ? `<div class="empty">${ic('search',36)}<b>No participant found</b>Check the chest number and try again.</div>` :
+    `<div class="card" style="padding:18px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">
       <div class="avatar" style="width:52px;height:52px;font-size:16px;">${initials(found.name)}</div>
       <div><div style="font-weight:700;font-size:15px;">${found.name}</div>
-      <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${found.chest} · ${team(found.teamId)?.name||'No team'}</div>
+      <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${found.chest} · ${team(found.teamId)?.name}</div>
       <div style="margin-top:6px;"><span class="chip chip-upcoming">${found.points} total points</span></div></div>
     </div>
-    <div class="section-head"><h2>Participated Events</h2></div>
-    ${participated.length ? participated.map(({ev,result})=>{
-      const pos = result?.position ? Number(result.position) : 0;
-      const rank = pos===1 || pos===2 || pos===3;
-      const rankBox = rank
-        ? `<div class="medal ${medalIcon(pos)}" style="flex:0 0 auto;">${pos}</div>`
-        : `<div style="width:48px;height:48px;border:1px solid rgba(255,255,255,.10);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:22px;font-weight:700;flex:0 0 auto;">−</div>`;
-      const grade = result?.grade ? String(result.grade) : 'NO GRADE';
-      return `<div class="podium-row" style="margin-bottom:10px;">
-        ${rankBox}
-        <div class="rank-info"><div class="name">${ev.name}</div><div class="sub">${grade}</div></div>
-        <div class="rank-pts"><b>${rank ? medalLabel(pos).toUpperCase() : '−'}</b><small>${result?.points ? result.points+' pts' : ''}</small></div>
+    <div class="section-head"><h2>Results</h2></div>
+    ${res.length? res.map(r=>{
+      const ev=event_(r.eventId);
+      return `<div class="podium-row p${r.position}">
+        <div class="medal ${medalIcon(r.position)}">${medalLabel(r.position)}</div>
+        <div class="rank-info"><div class="name">${ev.name}</div></div>
+        <div class="rank-pts"><b>${r.points}</b><small>pts</small></div>
       </div>`;
-    }).join('') : `<div class="empty">No participated events for this participant.</div>`}
+    }).join('') : `<div class="empty">No results yet for this participant.</div>`}
     `}
   `;
 }
-
 function doSearch(){
-  const v=document.getElementById('chestInput').value.trim();
-  nav('search',{q:v});
+  const v=document.getElementById('chestInput').value;
+  nav('search',{chest:v});
 }
 
 /* ============================= SCHEDULE ============================= */
@@ -770,7 +756,7 @@ function openEventForm(id){
     <form onsubmit="saveEvent(event,'${id||''}')">
       <div class="field"><label>Event Name</label><input id="ef-name" required value="${e?e.name:''}"></div>
       <div class="form-row2">
-        <div class="field"><label>Date</label><input id="ef-date" type="date" required value="${e?e.date:new Date().toLocaleDateString('en-CA')}"></div>
+        <div class="field"><label>Date</label><input id="ef-date" type="date" required value="${e?e.date:'2026-08-25'}"></div>
         <div class="field"><label>Time</label><input id="ef-time" type="time" required value="${e?e.time:'10:00'}"></div>
       </div>
       <div class="field"><label>Status</label><select id="ef-status">
@@ -793,16 +779,16 @@ function saveEvent(ev,id){
 
 /* ============================= ADMIN: REGISTRATIONS ============================= */
 function pageAdminRegistrations(){
-  if(!STATE.regEventId || !DB.events.some(e=>e.id===STATE.regEventId)) STATE.regEventId=DB.events[0]?.id || '';
+  const selected = (window._registrations||[]).filter(r=>r.eid===DB.events[0]?.id);
   return requireSuperAdmin(()=>{
-    const selectedEventId = STATE.regEventId || DB.events[0]?.id || '';
+    const selectedEventId = document.getElementById('reg-event')?.value || DB.events[0]?.id || '';
     return `
     ${backHead('Registrations','admin-dash')}
     <div class="card" style="padding:18px;">
       <div class="field">
         <label>Event</label>
-        <select id="reg-event" onchange="setRegistrationEvent(this.value)">
-          ${DB.events.map(e=>`<option value="${e.id}" ${selectedEventId===e.id?'selected':''}>${e.name}</option>`).join('')}
+        <select id="reg-event" onchange="renderSelectedEventRegistrations()">
+          ${DB.events.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}
         </select>
       </div>
       <div class="field">
@@ -816,10 +802,10 @@ function pageAdminRegistrations(){
     <div class="section-head" style="margin-top:22px;">
       <div>
         <div class="eyebrow">Event Participants</div>
-        <h2 id="selected-event-title">${event_(selectedEventId)?.name||'Selected Event'}</h2>
+        <h2 id="selected-event-title">${DB.events[0]?.name||'Selected Event'}</h2>
       </div>
     </div>
-    <div id="selected-event-participants">${renderSelectedEventList(selectedEventId)}</div>
+    <div id="selected-event-participants">${renderSelectedEventList(DB.events[0]?.id||'')}</div>
     `;
   });
 }
@@ -841,8 +827,6 @@ function renderSelectedEventList(eid){
   }).join('');
   return rows || `<div class="empty">${ic('users',36)}<b>No participants registered</b>Select an event and register participants.</div>`;
 }
-
-function setRegistrationEvent(eid){ STATE.regEventId=eid; renderSelectedEventRegistrations(); }
 
 function renderSelectedEventRegistrations(){
   const sel=document.getElementById('reg-event');
@@ -904,7 +888,7 @@ function pageAdminResults(){
     return `
     ${backHead('Enter Results','admin-dash')}
     <div class="card" style="padding:18px;">
-      <div class="field"><label>Event</label><select id="res-event">${DB.events.map(e=>`<option value="${e.id}" ${selectedEventId===e.id?'selected':''}>${e.name}</option>`).join('')}</select></div>
+      <div class="field"><label>Event</label><select id="res-event">${DB.events.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select></div>
       <div class="field"><label>Chest Number</label><input id="res-chest" placeholder="e.g. 101" oninput="resLookup()"></div>
       <div id="res-preview"></div>
 
@@ -1451,7 +1435,7 @@ async function saveAnn(ev,id){
 }
 async function saveComm(ev,id){
   ev.preventDefault(); const role=document.getElementById('cf-role').value.trim(), name=document.getElementById('cf-name').value.trim();
-  const payload={role,name,phone:'',photo:pendingContactPhoto||null};
+  const payload={role,name,photo:pendingContactPhoto||null};
   if(!id) payload.sort_order=DB.committee.reduce((m,c)=>Math.max(m,Number(c.sortOrder)||0),-1)+1;
   const {error}=id?await sb.from('committee').update(payload).eq('id',id):await sb.from('committee').insert(payload);
   if(error){sbToastError(error);return;} pendingContactPhoto=''; closeModal(); await loadRemoteDB(); render(); toast(id?'Committee profile updated':'Committee profile added');
@@ -1469,7 +1453,7 @@ async function doRegister(){
   const {data,error}=await sb.rpc('register_participant',{p_event_id:eid,p_participant_id:p.id});
   if(error){sbToastError(error);return;}
   if(data?.status==='exists'){toast('Already registered for this event'); regLookup(); return;}
-  STATE.regEventId=eid; await loadRemoteDB(); toast('Registered '+p.name); document.getElementById('reg-chest').value=''; document.getElementById('reg-preview').innerHTML=''; render();
+  await loadRemoteDB(); toast('Registered '+p.name); document.getElementById('reg-chest').value=''; document.getElementById('reg-preview').innerHTML=''; renderSelectedEventRegistrations();
 }
 
 /* Supabase Auth login. Username remains the visible field; it maps to the admin email. */
