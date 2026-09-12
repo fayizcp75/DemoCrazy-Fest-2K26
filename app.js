@@ -11,6 +11,8 @@ const ICONS = {
   results:'<path d="M8 21H16M12 17V21M6 4H18V9A6 6 0 0 1 6 9V4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 6H3V8A3 3 0 0 0 6 11M18 6H21V8A3 3 0 0 1 18 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   leaderboard:'<path d="M5 21V11M12 21V4M19 21V14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   more:'<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
+  play:'<path d="M8 5L19 12L8 19V5Z" fill="currentColor"/>',
+  share:'<path d="M12 16V4M8 8L12 4L16 8M5 13V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   chevronR:'<path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   back:'<path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
   clock:'<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12L15 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
@@ -290,6 +292,7 @@ function pageEventDetails(){
         <span>${ic('clock',14)} ${fmtTime(ev.time)}</span>
       </div>
     </div>
+    ${DB.results.some(r=>r.eventId===ev.id) ? `<button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="openEventResult('${ev.id}')">${ic('award',16)} View Result</button>` : ''}
   </div>
 
   <div class="section-head">
@@ -306,6 +309,7 @@ function pageEventDetails(){
         <div class="name">${p.name}</div>
         <div class="sub">Chest #${p.chest}${t ? ' · '+t.name : ''}</div>
       </div>
+      ${ev.videoUrl ? `<button class="mini-btn" type="button" onclick="event.stopPropagation();openVideo('${escAttr(ev.videoUrl)}')" title="Play video">${ic('play',13)} Play</button>` : ''}
     </div>
   `).join('') : `
     <div class="empty">${ic('users',40)}<b>No participants registered</b>Registrations for this event will appear here.</div>
@@ -347,10 +351,42 @@ function renderEventPodium(e){
           <div class="name">${p.name} <span style="color:var(--text-faint);font-weight:600;">#${p.chest}</span></div>
           <div class="sub">${team(p.teamId)?.name} · ${r.position?medalLabel(r.position):'NO PRIZE'} · ${r.grade||'NO GRADE'}</div>
         </div>
-        <div class="rank-pts"><b>${r.points}</b><small>pts</small></div>
+        <div class="rank-pts" style="display:flex;align-items:center;gap:8px;"><b>${r.points}</b><small>pts</small><button class="mini-btn" type="button" onclick="event.stopPropagation();shareParticipantResult('${e.id}','${r.id}')" title="Share result">${ic('share',13)}</button></div>
       </div>`;
     }).join('')}
   </div>`;
+}
+
+function openEventResult(eventId){
+  STATE.resultsTab=eventId;
+  nav('results');
+}
+function openVideo(url){
+  const u=String(url||'').trim();
+  if(!u) return;
+  window.open(u,'_blank','noopener,noreferrer');
+}
+async function shareParticipantResult(eventId,resultId){
+  const ev=event_(eventId), r=DB.results.find(x=>x.id===resultId), p=r?participant(r.participantId):null;
+  if(!ev||!r||!p) return;
+  const t=team(p.teamId)?.name||'—';
+  const lines=[
+    `DEMO CRAZY — ${ev.name}`,
+    `Participant: ${p.name}`,
+    `Chest: #${p.chest}`,
+    `Team: ${t}`,
+    `Result: ${r.position?medalLabel(r.position):'NO PRIZE'}`,
+    `Grade: ${r.grade||'NO GRADE'}`,
+    `Points: ${r.points}`
+  ];
+  const text=lines.join('\n');
+  try{
+    if(navigator.share){ await navigator.share({title:`${p.name} — ${ev.name}`,text}); toast('Result shared'); return; }
+  }catch(e){ if(e?.name==='AbortError') return; }
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('Result copied to clipboard');
+  }catch(e){ toast('Could not share result'); }
 }
 
 /* ============================= LEADERBOARD ============================= */
@@ -456,39 +492,49 @@ function pageTeamDetail(){
 
 /* ============================= SEARCH ============================= */
 function pageSearch(){
-  const chest = STATE.params.chest || '';
-  const found = chest ? DB.participants.find(p=>p.chest===chest.trim()) : null;
-  const res = found ? DB.results.filter(r=>r.participantId===found.id).sort((a,b)=>{const ea=event_(a.eventId), eb=event_(b.eventId); return ((eb?.date||'')+(eb?.time||'')).localeCompare((ea?.date||'')+(ea?.time||''));}) : [];
+  const q = String(STATE.params.q || '').trim();
   return `
   ${backHead('Search Participant','more')}
   <div class="searchbar">
     ${ic('search',18)}
-    <input id="chestInput" placeholder="Enter chest number, e.g. 101" value="${chest}" inputmode="numeric" onkeydown="if(event.key==='Enter')doSearch()">
-    <button class="btn btn-primary btn-sm" onclick="doSearch()">Search</button>
+    <input id="participantSearchInput" placeholder="Search name or chest number" value="${escAttr(q)}" inputmode="search" autocomplete="off" oninput="liveParticipantSearch(this.value)">
   </div>
-  ${!chest ? `<div class="empty">${ic('search',36)}<b>Search by chest number</b>Find a participant's team and results instantly.</div>` :
-    !found ? `<div class="empty">${ic('search',36)}<b>No participant found</b>Check the chest number and try again.</div>` :
-    `<div class="card" style="padding:18px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">
-      <div class="avatar" style="width:52px;height:52px;font-size:16px;">${initials(found.name)}</div>
-      <div><div style="font-weight:700;font-size:15px;">${found.name}</div>
-      <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${found.chest} · ${team(found.teamId)?.name}</div>
-      <div style="margin-top:6px;"><span class="chip chip-upcoming">${found.points} total points</span></div></div>
-    </div>
-    <div class="section-head"><h2>Results</h2></div>
-    ${res.length? res.map(r=>{
-      const ev=event_(r.eventId);
-      return `<div class="podium-row p${r.position}">
-        <div class="medal ${medalIcon(r.position)}">${medalLabel(r.position)}</div>
-        <div class="rank-info"><div class="name">${ev.name}</div></div>
-        <div class="rank-pts"><b>${r.points}</b><small>pts</small></div>
-      </div>`;
-    }).join('') : `<div class="empty">No results yet for this participant.</div>`}
-    `}
+  <div id="participantSearchResults">${renderParticipantSearchResults(q)}</div>
   `;
 }
+function renderParticipantSearchResults(q){
+  const query=String(q||'').trim().toLowerCase();
+  if(!query) return `<div class="empty">${ic('search',36)}<b>Search Participant</b>Type a name or chest number to search instantly.</div>`;
+  const found=DB.participants.filter(p=>String(p.name||'').toLowerCase().includes(query) || String(p.chest||'').toLowerCase().includes(query)).sort((a,b)=>String(a.chest).localeCompare(String(b.chest),undefined,{numeric:true}));
+  if(!found.length) return `<div class="empty">${ic('search',36)}<b>No participant found</b>Try another name or chest number.</div>`;
+  return found.map(p=>{
+    const regs=(window._registrations||[]).filter(r=>r.pid===p.id);
+    const events=regs.map(r=>event_(r.eid)).filter(Boolean).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    return `<div class="card" style="padding:18px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">
+      <div class="avatar" style="width:52px;height:52px;font-size:16px;">${initials(p.name)}</div>
+      <div><div style="font-weight:700;font-size:15px;">${esc(p.name)}</div>
+      <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${esc(p.chest)} · ${esc(team(p.teamId)?.name||'—')}</div>
+      <div style="margin-top:6px;"><span class="chip chip-upcoming">${Number(p.points)||0} total points</span></div></div>
+    </div>
+    <div class="section-head"><h2>Participated Events</h2></div>
+    ${events.length ? events.map(ev=>{
+      const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
+      return `<div class="rank-row">
+        <div class="medal ${r&&r.position?medalIcon(r.position):''}">${r&&r.position?medalLabel(r.position):'—'}</div>
+        <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? esc(r.grade||'NO GRADE') : 'NO GRADE'}</div></div>
+        <div class="rank-pts"><b>${r ? esc(r.grade||'NO GRADE') : '-'}</b></div>
+      </div>`;
+    }).join('') : `<div class="empty">No participated events found.</div>`}`;
+  }).join('');
+}
+function liveParticipantSearch(value){
+  STATE.params.q=value||'';
+  const box=document.getElementById('participantSearchResults');
+  if(box) box.innerHTML=renderParticipantSearchResults(STATE.params.q);
+}
 function doSearch(){
-  const v=document.getElementById('chestInput').value;
-  nav('search',{chest:v});
+  const el=document.getElementById('participantSearchInput');
+  liveParticipantSearch(el?el.value:'');
 }
 
 /* ============================= SCHEDULE ============================= */
@@ -756,12 +802,13 @@ function openEventForm(id){
     <form onsubmit="saveEvent(event,'${id||''}')">
       <div class="field"><label>Event Name</label><input id="ef-name" required value="${e?e.name:''}"></div>
       <div class="form-row2">
-        <div class="field"><label>Date</label><input id="ef-date" type="date" required value="${e?e.date:'2026-08-25'}"></div>
+        <div class="field"><label>Date</label><input id="ef-date" type="date" required value="${e?e.date:new Date().toISOString().slice(0,10)}"></div>
         <div class="field"><label>Time</label><input id="ef-time" type="time" required value="${e?e.time:'10:00'}"></div>
       </div>
       <div class="field"><label>Status</label><select id="ef-status">
         ${['LIVE','UPCOMING','COMPLETED'].map(s=>`<option value="${s}" ${e&&e.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
+      <div class="field"><label>Event Video Link <span class="muted">(optional)</span></label><input id="ef-video" type="url" placeholder="https://..." value="${escAttr(e?.videoUrl||'')}"></div>
       <button class="btn btn-primary btn-block" type="submit">${ic('check',16)} Save Event</button>
     </form>
   `);
@@ -1359,7 +1406,7 @@ async function loadRemoteDB(){
   const announcements=get('announcements').data, committee=get('committee').data, contacts=get('contacts').data;
   const registrations=get('registrations').data, aboutRows=get('about_fest').data;
 
-  DB.events=events.map(e=>({id:e.id,name:e.name,date:e.event_date||'',time:e.event_time||'',status:e.status||'UPCOMING',details:e.details||'',venue:e.venue||''}));
+  DB.events=events.map(e=>({id:e.id,name:e.name,date:e.event_date||'',time:e.event_time||'',status:e.status||'UPCOMING',details:e.details||'',venue:e.venue||'',videoUrl:e.video_url||''}));
   DB.teams=teams.map(t=>({id:t.id,name:t.name,color:t.color||'#d91f26',leaderIds:Array.isArray(t.leader_ids)?t.leader_ids:[]}));
   DB.participants=participants.map(p=>({id:p.id,name:p.name,chest:p.chest||'',teamId:p.team_id,points:Number(p.points)||0,phone:p.phone||''}));
   DB.results=results.map(r=>({id:r.id,eventId:r.event_id,position:Number(r.position)||0,participantId:r.participant_id,points:Number(r.points)||0,grade:r.grade||'',prize:r.prize||''}));
@@ -1411,8 +1458,8 @@ async function saveTeam(ev,id){
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Team updated':'Team added');
 }
 async function saveEvent(ev,id){
-  ev.preventDefault(); const name=document.getElementById('ef-name').value.trim(), date=document.getElementById('ef-date').value, time=document.getElementById('ef-time').value, status=document.getElementById('ef-status').value;
-  const payload={name,event_date:date,event_time:time,status};
+  ev.preventDefault(); const name=document.getElementById('ef-name').value.trim(), date=document.getElementById('ef-date').value, time=document.getElementById('ef-time').value, status=document.getElementById('ef-status').value, videoUrl=document.getElementById('ef-video')?.value.trim()||'';
+  const payload={name,event_date:date,event_time:time,status,video_url:videoUrl||null};
   const {error}=id?await sb.from('events').update(payload).eq('id',id):await sb.from('events').insert(payload);
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Event updated':'Event added');
 }
