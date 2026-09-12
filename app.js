@@ -44,6 +44,7 @@ let DB = {
   announcements:[],
   committee:[],
   contacts:[],
+  eventParticipantVideos:[],
   aboutContent:''
 };
 
@@ -309,7 +310,7 @@ function pageEventDetails(){
         <div class="name">${p.name}</div>
         <div class="sub">Chest #${p.chest}${t ? ' · '+t.name : ''}</div>
       </div>
-      ${ev.videoUrl ? `<button class="mini-btn" type="button" onclick="event.stopPropagation();openVideo('${escAttr(ev.videoUrl)}')" title="Play video">${ic('play',13)} Play</button>` : ''}
+      ${eventParticipantVideo(ev.id,p.id) ? `<button class="mini-btn" type="button" onclick="event.stopPropagation();openVideo('${escAttr(eventParticipantVideo(ev.id,p.id))}')" title="Play video">${ic('play',13)} Play</button>` : ''}
     </div>
   `).join('') : `
     <div class="empty">${ic('users',40)}<b>No participants registered</b>Registrations for this event will appear here.</div>
@@ -361,11 +362,45 @@ function openEventResult(eventId){
   STATE.resultsTab=eventId;
   nav('results');
 }
+function eventParticipantVideo(eventId, participantId){
+  const row=(DB.eventParticipantVideos||[]).find(x=>x.eventId===eventId && x.participantId===participantId);
+  return row?.videoUrl||'';
+}
 function openVideo(url){
   const u=String(url||'').trim();
   if(!u) return;
   window.open(u,'_blank','noopener,noreferrer');
 }
+async function shareParticipantProfile(participantId){
+  const p=participant(participantId);
+  if(!p) return;
+  const t=team(p.teamId)?.name||'—';
+  const regs=(window._registrations||[]).filter(x=>x.pid===p.id);
+  const events=regs.map(x=>event_(x.eid)).filter(Boolean).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const lines=[
+    'DEMO CRAZY — PARTICIPANT RESULT',
+    `Name: ${p.name}`,
+    `Chest: #${p.chest}`,
+    `Team: ${t}`,
+    `Total Points: ${Number(p.points)||0}`,
+    '',
+    'PARTICIPATED EVENTS'
+  ];
+  events.forEach(ev=>{
+    const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
+    const result=r ? (r.position ? medalLabel(r.position) : 'NO PRIZE') : 'NO RESULT';
+    const pts=r ? Number(r.points)||0 : 0;
+    const grade=r?.grade ? ` · ${r.grade}` : '';
+    lines.push(`${ev.name} — ${result}${grade} · ${pts} pts`);
+  });
+  const text=lines.join('\n');
+  try{
+    if(navigator.share){ await navigator.share({title:`${p.name} — DEMO CRAZY`,text}); toast('Result shared'); return; }
+  }catch(e){ if(e?.name==='AbortError') return; }
+  try{ await navigator.clipboard.writeText(text); toast('Result copied to clipboard'); }
+  catch(e){ toast('Could not share result'); }
+}
+
 async function shareParticipantResult(eventId,resultId){
   const ev=event_(eventId), r=DB.results.find(x=>x.id===resultId), p=r?participant(r.participantId):null;
   if(!ev||!r||!p) return;
@@ -493,8 +528,11 @@ function pageTeamDetail(){
 /* ============================= SEARCH ============================= */
 function pageSearch(){
   const q = String(STATE.params.q || '').trim();
+  const query=String(q||'').trim().toLowerCase();
+  const found=query ? DB.participants.filter(p=>String(p.name||'').toLowerCase().includes(query) || String(p.chest||'').toLowerCase().includes(query)) : [];
+  const shareBtn=found.length===1 ? `<button class="icon-btn" onclick="shareParticipantProfile('${found[0].id}')" title="Share full result">${ic('share',18)}</button>` : '';
   return `
-  ${backHead('Search Participant','more')}
+  <div class="subpage-head"><button class="icon-btn" onclick="nav('more')">${ic('back',18)}</button><h1>Search Participant</h1>${shareBtn}</div>
   <div class="searchbar">
     ${ic('search',18)}
     <input id="participantSearchInput" placeholder="Search name or chest number" value="${escAttr(q)}" inputmode="search" autocomplete="off" oninput="liveParticipantSearch(this.value)">
@@ -521,8 +559,8 @@ function renderParticipantSearchResults(q){
       const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
       return `<div class="rank-row">
         <div class="medal ${r&&r.position?medalIcon(r.position):''}">${r&&r.position?medalLabel(r.position):'—'}</div>
-        <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? esc(r.grade||'NO GRADE') : 'NO GRADE'}</div></div>
-        <div class="rank-pts"><b>${r ? esc(r.grade||'NO GRADE') : '-'}</b></div>
+        <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? `${Number(r.points)||0} points` : '0 points'}</div></div>
+        <div class="rank-pts"><b>${r ? Number(r.points)||0 : 0}</b><small>pts</small></div>
       </div>`;
     }).join('') : `<div class="empty">No participated events found.</div>`}`;
   }).join('');
@@ -779,6 +817,39 @@ function saveTeam(ev,id){
   closeModal(); render();
 }
 
+/* ============================= ADMIN: PARTICIPANT VIDEOS ============================= */
+function openParticipantVideos(eventId){
+  const ev=event_(eventId); if(!ev) return;
+  const registered=(window._registrations||[]).filter(r=>r.eid===eventId).map(r=>participant(r.pid)).filter(Boolean).sort((a,b)=>String(a.chest).localeCompare(String(b.chest),undefined,{numeric:true}));
+  const rows=registered.length ? registered.map(p=>{
+    const url=eventParticipantVideo(eventId,p.id);
+    return `<div class="card" style="padding:12px;margin-bottom:10px;">
+      <div style="font-weight:800;font-size:13px;margin-bottom:8px;">${esc(p.name)} <span style="color:var(--text-faint);font-weight:600;">#${esc(p.chest)}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="pv-${p.id}" type="url" placeholder="https://video-link..." value="${escAttr(url)}" style="flex:1;min-width:0;">
+        <button class="mini-btn" type="button" onclick="saveParticipantVideo('${eventId}','${p.id}')">Save</button>
+      </div>
+      ${url?`<div style="margin-top:7px;font-size:10px;color:var(--text-dim);">Video link saved</div>`:''}
+    </div>`;
+  }).join('') : `<div class="empty">${ic('users',36)}<b>No registered participants</b>Register participants for this event first.</div>`;
+  openModal(`<div class="modal-head"><h3>Participant Videos</h3><button class="icon-btn" onclick="closeModal()">${ic('x',16)}</button></div>
+    <div class="hint-box" style="margin-bottom:12px;"><b>${esc(ev.name)}</b><br>Each participant can have a separate video link.</div>${rows}`);
+}
+async function saveParticipantVideo(eventId,participantId){
+  const input=document.getElementById(`pv-${participantId}`); if(!input) return;
+  const videoUrl=input.value.trim();
+  if(videoUrl && !/^https?:\/\//i.test(videoUrl)){ toast('Enter a valid video URL'); return; }
+  if(!videoUrl){
+    const {error}=await sb.from('event_participant_videos').delete().eq('event_id',eventId).eq('participant_id',participantId);
+    if(error){sbToastError(error,'Could not remove video');return;}
+  }else{
+    const payload={event_id:eventId,participant_id:participantId,video_url:videoUrl,updated_at:new Date().toISOString()};
+    const {error}=await sb.from('event_participant_videos').upsert(payload,{onConflict:'event_id,participant_id'});
+    if(error){sbToastError(error,'Could not save video');return;}
+  }
+  await loadRemoteDB(); openParticipantVideos(eventId); toast(videoUrl?'Video saved':'Video removed');
+}
+
 /* ============================= ADMIN: EVENTS ============================= */
 function pageAdminEvents(){
   return requireSuperAdmin(()=>`
@@ -789,7 +860,7 @@ function pageAdminEvents(){
     <tr><th>Event</th><th>Date</th><th>Time</th><th>Status</th><th></th></tr>
     ${DB.events.map(e=>`
       <tr><td>${e.name}</td><td>${fmtDate(e.date)}</td><td>${fmtTime(e.time)}</td><td>${statusChip(e.status)}</td>
-      <td><div class="row-actions"><button class="mini-btn" onclick="openEventForm('${e.id}')">Edit</button><button class="mini-btn danger" onclick="deleteEvent('${e.id}')">Delete</button></div></td></tr>
+      <td><div class="row-actions"><button class="mini-btn" onclick="openParticipantVideos('${e.id}')">Videos</button><button class="mini-btn" onclick="openEventForm('${e.id}')">Edit</button><button class="mini-btn danger" onclick="deleteEvent('${e.id}')">Delete</button></div></td></tr>
     `).join('')}
   </table>
   </div>
@@ -808,7 +879,6 @@ function openEventForm(id){
       <div class="field"><label>Status</label><select id="ef-status">
         ${['LIVE','UPCOMING','COMPLETED'].map(s=>`<option value="${s}" ${e&&e.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
-      <div class="field"><label>Event Video Link <span class="muted">(optional)</span></label><input id="ef-video" type="url" placeholder="https://..." value="${escAttr(e?.videoUrl||'')}"></div>
       <button class="btn btn-primary btn-block" type="submit">${ic('check',16)} Save Event</button>
     </form>
   `);
@@ -1391,7 +1461,7 @@ async function loadRemoteDB(){
   // cannot make the entire public app report a backend failure.
   const names=[
     ['events','created_at'],['teams','created_at'],['participants','created_at'],['results','created_at'],
-    ['announcements','date'],['committee','sort_order'],['contacts','sort_order'],['registrations','created_at'],['about_fest','updated_at']
+    ['announcements','date'],['event_participant_videos','created_at'],['committee','sort_order'],['contacts','sort_order'],['registrations','created_at'],['about_fest','updated_at']
   ];
   const settled=await Promise.all(names.map(async ([table,order])=>{
     try{ return {table,data:await sbLoadTable(table,order),error:null}; }
@@ -1414,6 +1484,8 @@ async function loadRemoteDB(){
   DB.committee=committee.map(c=>({id:c.id,role:c.role,name:c.name,photo:c.photo||'',sortOrder:Number(c.sort_order)||0}));
   DB.contacts=contacts.map(c=>({id:c.id,role:c.role,name:c.name,phone:c.phone||'',photo:c.photo||'',sortOrder:Number(c.sort_order)||0}));
   DB.aboutContent=aboutRows.find(a=>a.id==='main')?.content||'';
+  const eventVideos=get('event_participant_videos').data;
+  DB.eventParticipantVideos=eventVideos.map(v=>({id:v.id,eventId:v.event_id,participantId:v.participant_id,videoUrl:v.video_url||''}));
   window._registrations=registrations.map(r=>({id:r.id,eid:r.event_id,pid:r.participant_id}));
   recalc();
 }
