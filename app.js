@@ -390,8 +390,7 @@ async function shareParticipantProfile(participantId){
     const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
     const result=r ? (r.position ? medalLabel(r.position) : 'NO PRIZE') : 'NO RESULT';
     const pts=r ? Number(r.points)||0 : 0;
-    const grade=r?.grade ? ` · ${r.grade}` : '';
-    lines.push(`${ev.name} — ${result}${grade} · ${pts} pts`);
+    lines.push(`${ev.name} — ${result} · ${pts} pts`);
   });
   const text=lines.join('\n');
   try{
@@ -530,7 +529,7 @@ function pageSearch(){
   const q = String(STATE.params.q || '').trim();
   const query=String(q||'').trim().toLowerCase();
   const found=query ? DB.participants.filter(p=>String(p.name||'').toLowerCase().includes(query) || String(p.chest||'').toLowerCase().includes(query)) : [];
-  const shareBtn=found.length===1 ? `<button class="icon-btn" onclick="shareParticipantProfile('${found[0].id}')" title="Share full result">${ic('share',18)}</button>` : '';
+  const shareBtn=found.length===1 ? `<button class="icon-btn" style="margin-left:auto;" onclick="shareParticipantProfile('${found[0].id}')" title="Share full result" aria-label="Share full result">${ic('share',18)}</button>` : '';
   return `
   <div class="subpage-head"><button class="icon-btn" onclick="nav('more')">${ic('back',18)}</button><h1>Search Participant</h1>${shareBtn}</div>
   <div class="searchbar">
