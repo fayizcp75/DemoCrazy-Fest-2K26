@@ -390,7 +390,9 @@ async function shareParticipantProfile(participantId){
     const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
     const result=r ? (r.position ? medalLabel(r.position) : 'NO PRIZE') : 'NO RESULT';
     const pts=r ? Number(r.points)||0 : 0;
-    lines.push(`${ev.name} — ${result} · ${pts} pts`);
+    const grade=r ? (r.grade || 'NO GRADE') : 'NO GRADE';
+    const prize=r ? (r.position ? medalLabel(r.position) : 'NO PRIZE') : 'NO RESULT';
+    lines.push(`${ev.name} — ${prize} · ${grade} · ${pts} pts`);
   });
   const text=lines.join('\n');
   try{
@@ -558,8 +560,8 @@ function renderParticipantSearchResults(q){
       const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
       return `<div class="rank-row">
         <div class="medal ${r&&r.position?medalIcon(r.position):''}">${r&&r.position?medalLabel(r.position):'—'}</div>
-        <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? `${Number(r.points)||0} points` : '0 points'}</div></div>
-        <div class="rank-pts"><b>${r ? Number(r.points)||0 : 0}</b><small>pts</small></div>
+        <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? esc(r.grade||'NO GRADE') : 'NO GRADE'}</div></div>
+        <div class="rank-pts"><b>${r ? Number(r.points)||0 : 0}</b><small>PTS</small></div>
       </div>`;
     }).join('') : `<div class="empty">No participated events found.</div>`}`;
   }).join('');
