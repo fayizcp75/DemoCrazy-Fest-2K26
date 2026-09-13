@@ -732,6 +732,11 @@ function pageAdminDash(){
   <div class="subpage-head"><button class="icon-btn" onclick="nav('more')">${ic('back',18)}</button><h1>Admin Dashboard</h1><button class="icon-btn" style="margin-left:auto;" onclick="adminLogout()" title="Log out">${ic('x',16)}</button></div>
   <div class="hint-box" style="margin-bottom:14px;"><b>${CURRENT_ADMIN.role==='SUPER'?'Super Admin':'Normal Admin'}</b> · ${CURRENT_ADMIN.name}</div>
   <div class="stat-grid"><div class="card stat-card"><div class="n">${DB.participants.length}</div><div class="l">Total Participants</div></div><div class="card stat-card"><div class="n">${DB.teams.length}</div><div class="l">Total Teams</div></div><div class="card stat-card"><div class="n">${DB.events.length}</div><div class="l">Total Events</div></div><div class="card stat-card"><div class="n">${DB.results.length}</div><div class="l">Total Results</div></div></div>
+  <div class="card" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+    <div class="ai" style="margin:0;"><span style="display:block;width:10px;height:10px;border-radius:50%;background:#36d66b;box-shadow:0 0 12px rgba(54,214,107,.75);"></span></div>
+    <div style="flex:1;"><b style="font-size:14px;">Online Now</b><div style="font-size:11px;color:var(--text-dim);">Active app sessions</div></div>
+    <div id="onlineCount" style="font-size:22px;font-weight:800;">${ONLINE_COUNT}</div>
+  </div>
   <div class="admin-grid">
     ${isSuperAdmin()?`${adminTile('admin-participants','users','Participants','Add & edit participants')}${adminTile('admin-teams','team','Teams','Manage teams & leaders')}${adminTile('admin-events','events','Events','Create & update events')}${adminTile('admin-registrations','check','Registrations','Register by chest no.')}`:''}
     ${adminTile('admin-results','award','Results','Enter event results')}${adminTile('admin-announcements','megaphone','Announcements','Publish updates')}${isSuperAdmin()?adminTile('admin-about','info','About Fest','Edit fest information'):''}
@@ -1475,6 +1480,9 @@ const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vlvmaG47HbaAaS7T3kteoQ_9bIa-yxP
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 let SB_READY = false;
 let SB_CHANNEL = null;
+let ONLINE_CHANNEL = null;
+let ONLINE_COUNT = 0;
+const ONLINE_SESSION_KEY = (()=>{ try{ let k=sessionStorage.getItem('dc_online_session'); if(!k){ k='s_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2); sessionStorage.setItem('dc_online_session',k); } return k; }catch(e){ return 's_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2); } })();
 
 function sbToastError(err, fallback='Could not save data'){
   console.error(err); toast(err?.message || fallback);
@@ -1525,6 +1533,26 @@ function setupRealtime(){
     .on('postgres_changes',{event:'*',schema:'public'},()=>refreshRemote())
     .subscribe();
 }
+function updateOnlineCount(state){
+  ONLINE_COUNT=Object.keys(state||{}).length;
+  const el=document.getElementById('onlineCount');
+  if(el) el.textContent=ONLINE_COUNT;
+}
+function setupOnlinePresence(){
+  if(ONLINE_CHANNEL) return;
+  try{
+    ONLINE_CHANNEL=sb.channel('democrazy-online',{config:{presence:{key:ONLINE_SESSION_KEY}}});
+    ONLINE_CHANNEL.on('presence',{event:'sync'},()=>updateOnlineCount(ONLINE_CHANNEL.presenceState()));
+    ONLINE_CHANNEL.on('presence',{event:'join'},()=>updateOnlineCount(ONLINE_CHANNEL.presenceState()));
+    ONLINE_CHANNEL.on('presence',{event:'leave'},()=>updateOnlineCount(ONLINE_CHANNEL.presenceState()));
+    ONLINE_CHANNEL.subscribe(async status=>{
+      if(status==='SUBSCRIBED'){
+        await ONLINE_CHANNEL.track({online_at:new Date().toISOString()});
+        updateOnlineCount(ONLINE_CHANNEL.presenceState());
+      }
+    });
+  }catch(e){ console.error('Online presence failed',e); }
+}
 let refreshTimer=null;
 async function refreshRemote(){
   clearTimeout(refreshTimer);
@@ -1532,7 +1560,7 @@ async function refreshRemote(){
 }
 async function initRemote(){
   try{
-    await loadRemoteDB(); SB_READY=true; setupRealtime(); render();
+    await loadRemoteDB(); SB_READY=true; setupRealtime(); setupOnlinePresence(); render();
   }catch(e){
     console.error(e);
     toast('Backend connection failed');
