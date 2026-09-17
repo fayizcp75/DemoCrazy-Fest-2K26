@@ -36,6 +36,8 @@ const ICONS = {
 function ic(name,size=18){return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none">${ICONS[name]||''}</svg>`;}
 
 /* ============================= DATA ============================= */
+let STATE_REG_EVENT_ID = '';
+
 let DB = {
   events:[],
   teams:[],
@@ -295,6 +297,7 @@ function pageEvents(){
       <div class="ticket-body">
         <div class="trow"><div class="tname">${e.name}</div></div>
         <div class="trow">${statusChip(e.status)}</div>
+        ${e.venue ? `<div class="trow"><span class="sub">${ic('info',13)} ${esc(e.venue)}</span></div>` : ''}
       </div>
     </div>`).join('')}
   `;
@@ -320,6 +323,7 @@ function pageEventDetails(){
       <div class="next-meta" style="margin-bottom:0;">
         <span>${ic('calendar',14)} ${fmtDate(ev.date)}</span>
         <span>${ic('clock',14)} ${fmtTime(ev.time)}</span>
+        ${ev.venue ? `<span>${ic('info',14)} ${esc(ev.venue)}</span>` : ''}
       </div>
     </div>
     ${DB.results.some(r=>r.eventId===ev.id) ? `<button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="openEventResult('${ev.id}')">${ic('award',16)} View Result</button>` : ''}
@@ -911,6 +915,7 @@ function openEventForm(id){
         <div class="field"><label>Date</label><input id="ef-date" type="date" required value="${e?e.date:new Date().toISOString().slice(0,10)}"></div>
         <div class="field"><label>Time</label><input id="ef-time" type="time" required value="${e?e.time:'10:00'}"></div>
       </div>
+      <div class="field"><label>Venue</label><input id="ef-venue" placeholder="e.g. Main Stage" value="${e?escAttr(e.venue||''):''}"></div>
       <div class="field"><label>Status</label><select id="ef-status">
         ${['LIVE','UPCOMING','COMPLETED'].map(s=>`<option value="${s}" ${e&&e.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
@@ -924,8 +929,9 @@ function saveEvent(ev,id){
   const date=document.getElementById('ef-date').value;
   const time=document.getElementById('ef-time').value;
   const status=document.getElementById('ef-status').value;
-  if(id){ const e=event_(id); e.name=name; e.date=date; e.time=time; e.status=status; toast('Event updated'); }
-  else{ DB.events.push({id:uid('e'),name,date,time,status}); toast('Event added'); }
+  const venue=document.getElementById('ef-venue')?.value.trim()||'';
+  if(id){ const e=event_(id); e.name=name; e.date=date; e.time=time; e.status=status; e.venue=venue; toast('Event updated'); }
+  else{ DB.events.push({id:uid('e'),name,date,time,status,venue}); toast('Event added'); }
   closeModal(); render();
 }
 
@@ -933,14 +939,14 @@ function saveEvent(ev,id){
 function pageAdminRegistrations(){
   const selected = (window._registrations||[]).filter(r=>r.eid===DB.events[0]?.id);
   return requireSuperAdmin(()=>{
-    const selectedEventId = document.getElementById('reg-event')?.value || DB.events[0]?.id || '';
+    const selectedEventId = STATE_REG_EVENT_ID || document.getElementById('reg-event')?.value || DB.events[0]?.id || '';
     return `
     ${backHead('Registrations','admin-dash')}
     <div class="card" style="padding:18px;">
       <div class="field">
         <label>Event</label>
-        <select id="reg-event" onchange="renderSelectedEventRegistrations()">
-          ${DB.events.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}
+        <select id="reg-event" onchange="STATE_REG_EVENT_ID=this.value; renderSelectedEventRegistrations()">
+          ${DB.events.map(e=>`<option value="${e.id}" ${e.id===STATE_REG_EVENT_ID?'selected':''}>${e.name}</option>`).join('')}
         </select>
       </div>
       <div class="field">
@@ -984,6 +990,7 @@ function renderSelectedEventRegistrations(){
   const sel=document.getElementById('reg-event');
   if(!sel) return;
   const eid=sel.value;
+  STATE_REG_EVENT_ID=eid;
   const title=document.getElementById('selected-event-title');
   const list=document.getElementById('selected-event-participants');
   const e=event_(eid);
@@ -1588,8 +1595,8 @@ async function saveTeam(ev,id){
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Team updated':'Team added');
 }
 async function saveEvent(ev,id){
-  ev.preventDefault(); const name=document.getElementById('ef-name').value.trim(), date=document.getElementById('ef-date').value, time=document.getElementById('ef-time').value, status=document.getElementById('ef-status').value, videoUrl=document.getElementById('ef-video')?.value.trim()||'';
-  const payload={name,event_date:date,event_time:time,status,video_url:videoUrl||null};
+  ev.preventDefault(); const name=document.getElementById('ef-name').value.trim(), date=document.getElementById('ef-date').value, time=document.getElementById('ef-time').value, status=document.getElementById('ef-status').value, venue=document.getElementById('ef-venue')?.value.trim()||'', videoUrl=document.getElementById('ef-video')?.value.trim()||'';
+  const payload={name,event_date:date,event_time:time,status,venue:venue||null,video_url:videoUrl||null};
   const {error}=id?await sb.from('events').update(payload).eq('id',id):await sb.from('events').insert(payload);
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Event updated':'Event added');
 }
@@ -1630,7 +1637,14 @@ async function doRegister(){
   const {data,error}=await sb.rpc('register_participant',{p_event_id:eid,p_participant_id:p.id});
   if(error){sbToastError(error);return;}
   if(data?.status==='exists'){toast('Already registered for this event'); regLookup(); return;}
-  await loadRemoteDB(); toast('Registered '+p.name); document.getElementById('reg-chest').value=''; document.getElementById('reg-preview').innerHTML=''; renderSelectedEventRegistrations();
+  STATE_REG_EVENT_ID=eid;
+  await loadRemoteDB();
+  const eventSelect=document.getElementById('reg-event');
+  if(eventSelect) eventSelect.value=eid;
+  toast('Registered '+p.name);
+  document.getElementById('reg-chest').value='';
+  document.getElementById('reg-preview').innerHTML='';
+  renderSelectedEventRegistrations();
 }
 
 /* Supabase Auth login. Username remains the visible field; it maps to the admin email. */
