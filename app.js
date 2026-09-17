@@ -1057,8 +1057,6 @@ function pageAdminResults(){
       <div class="field"><label>Chest Number</label><input id="res-chest" placeholder="e.g. 101" oninput="resLookup()"></div>
       <div id="res-preview"></div>
 
-      <div class="field"><label>Rank</label><input id="res-rank" type="number" min="1" step="1" placeholder="e.g. 4"></div>
-
       <div class="field"><label>Prize</label><select id="res-prize" onchange="syncResultPoints()">
         <option value="">NO PRIZE</option>
         <option value="1ST">1ST</option>
@@ -1117,8 +1115,7 @@ function doSaveResult(){
   const chest=document.getElementById('res-chest').value.trim();
   const prize=document.getElementById('res-prize').value;
   const grade=document.getElementById('res-grade').value || '';
-  const rankInput=Number(document.getElementById('res-rank')?.value)||0;
-  const position=rankInput;
+  const position=prize==='1ST'?1:prize==='2'?2:prize==='3'?3:0;
   const points=Number(document.getElementById('res-points').value)||0;
   const p=DB.participants.find(x=>x.chest===chest);
   if(!p){ toast('No participant with that chest number'); return; }
@@ -1443,9 +1440,8 @@ function editResult(id){
   const p=participant(r.participantId);
   if(!p) return;
   const ev=document.getElementById('res-event'), chest=document.getElementById('res-chest');
-  const rank=document.getElementById('res-rank'), prize=document.getElementById('res-prize'), grade=document.getElementById('res-grade'), points=document.getElementById('res-points');
+  const prize=document.getElementById('res-prize'), grade=document.getElementById('res-grade'), points=document.getElementById('res-points');
   if(ev) ev.value=r.eventId;
-  if(rank) rank.value=r.position ? Number(r.position) : '';
   if(chest) chest.value=p.chest;
   if(prize) prize.value=r.prize || (r.position===1?'1ST':r.position===2?'2':r.position===3?'3':'');
   if(grade) grade.value=r.grade||'';
@@ -1612,8 +1608,7 @@ async function saveEvent(ev,id){
 }
 async function doSaveResult(){
   const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prize=document.getElementById('res-prize').value, grade=document.getElementById('res-grade').value||'';
-  const position=Number(document.getElementById('res-rank')?.value)||0, points=Number(document.getElementById('res-points').value)||0;
-  if(position<1){toast('Enter a valid rank');return;}
+  const position=prize==='1ST'?1:prize==='2'?2:prize==='3'?3:0, points=Number(document.getElementById('res-points').value)||0;
   const p=DB.participants.find(x=>x.chest===chest); if(!p){toast('No participant with that chest number');return;}
   const payload={event_id:eid,participant_id:p.id,position,points,grade,prize};
   const {error}=await sb.from('results').upsert(payload,{onConflict:'event_id,participant_id'});
