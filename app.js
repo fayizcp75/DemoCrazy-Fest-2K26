@@ -87,7 +87,7 @@ function statusChip(s){
   return `<span class="chip chip-completed">Completed</span>`;
 }
 function medalIcon(pos){return pos===1?'g':pos===2?'s':'b';}
-function medalLabel(pos){return pos===1?'1st':pos===2?'2nd':'3rd';}
+function medalLabel(pos){const n=Number(pos)||0;if(n===1)return '1st';if(n===2)return '2nd';if(n===3)return '3rd';if(n>0){const v=n%100;const suf=(v>=11&&v<=13)?'th':n%10===1?'st':n%10===2?'nd':n%10===3?'rd':'th';return n+suf;}return '—';}
 
 /* ============================= STATE / ROUTER ============================= */
 let STATE = {route:'home', params:{}, adminLoggedIn:false, resultsTab:null, leaderboardTab:'teams'};
@@ -216,8 +216,9 @@ function pageHome(){
       <div class="section-head home-card-head"><div><div class="eyebrow">Live now</div><h2>Live</h2></div></div>
       ${live ? `
       <div class="hero-live">
-        <div class="eyebrow-row">${statusChip('LIVE')}<span style="font-size:11px;color:var(--text-dim);">Main Stage</span></div>
-        <h3>${live.name}</h3>
+        <div class="eyebrow-row">${statusChip('LIVE')}</div>
+        <h3>${esc(live.name)}</h3>
+        <p>${ic('mapPin',14)} ${esc(live.venue || 'Venue not set')}</p>
         <p>In progress · started ${fmtTime(live.time)} today</p>
       </div>` : `<div class="hero-none">No event is live right now — check Events for what's next.</div>`}
     </div>
@@ -227,8 +228,9 @@ function pageHome(){
       ${upcoming ? `
       <div class="hero-live next-as-live">
         <div class="eyebrow-row">${statusChip('UPCOMING')}<span style="font-size:11px;color:var(--text-dim);">${fmtDate(upcoming.date)}</span></div>
-        <h3>${upcoming.name}</h3>
+        <h3>${esc(upcoming.name)}</h3>
         <p>${ic('clock',14)} ${fmtTime(upcoming.time)}</p>
+        <p>${ic('mapPin',14)} ${esc(upcoming.venue || 'Venue not set')}</p>
       </div>` : `<div class="hero-none">No upcoming event.</div>`}
     </div>
   </div>
@@ -915,7 +917,11 @@ function openEventForm(id){
         <div class="field"><label>Date</label><input id="ef-date" type="date" required value="${e?e.date:new Date().toISOString().slice(0,10)}"></div>
         <div class="field"><label>Time</label><input id="ef-time" type="time" required value="${e?e.time:'10:00'}"></div>
       </div>
-      <div class="field"><label>Venue</label><input id="ef-venue" placeholder="e.g. Main Stage" value="${e?escAttr(e.venue||''):''}"></div>
+      <div class="field"><label>Venue</label><select id="ef-venue">
+        <option value="" ${!e||!e.venue?'selected':''}>Choose Venue</option>
+        <option value="Auditorium" ${e&&e.venue==='Auditorium'?'selected':''}>Auditorium</option>
+        <option value="Seminar Hall" ${e&&e.venue==='Seminar Hall'?'selected':''}>Seminar Hall</option>
+      </select></div>
       <div class="field"><label>Status</label><select id="ef-status">
         ${['LIVE','UPCOMING','COMPLETED'].map(s=>`<option value="${s}" ${e&&e.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
@@ -1051,6 +1057,8 @@ function pageAdminResults(){
       <div class="field"><label>Chest Number</label><input id="res-chest" placeholder="e.g. 101" oninput="resLookup()"></div>
       <div id="res-preview"></div>
 
+      <div class="field"><label>Rank</label><input id="res-rank" type="number" min="1" step="1" placeholder="e.g. 4"></div>
+
       <div class="field"><label>Prize</label><select id="res-prize" onchange="syncResultPoints()">
         <option value="">NO PRIZE</option>
         <option value="1ST">1ST</option>
@@ -1109,7 +1117,8 @@ function doSaveResult(){
   const chest=document.getElementById('res-chest').value.trim();
   const prize=document.getElementById('res-prize').value;
   const grade=document.getElementById('res-grade').value || '';
-  const position=prize ? Number(prize) : 0;
+  const rankInput=Number(document.getElementById('res-rank')?.value)||0;
+  const position=rankInput;
   const points=Number(document.getElementById('res-points').value)||0;
   const p=DB.participants.find(x=>x.chest===chest);
   if(!p){ toast('No participant with that chest number'); return; }
@@ -1434,8 +1443,9 @@ function editResult(id){
   const p=participant(r.participantId);
   if(!p) return;
   const ev=document.getElementById('res-event'), chest=document.getElementById('res-chest');
-  const prize=document.getElementById('res-prize'), grade=document.getElementById('res-grade'), points=document.getElementById('res-points');
+  const rank=document.getElementById('res-rank'), prize=document.getElementById('res-prize'), grade=document.getElementById('res-grade'), points=document.getElementById('res-points');
   if(ev) ev.value=r.eventId;
+  if(rank) rank.value=r.position ? Number(r.position) : '';
   if(chest) chest.value=p.chest;
   if(prize) prize.value=r.prize || (r.position===1?'1ST':r.position===2?'2':r.position===3?'3':'');
   if(grade) grade.value=r.grade||'';
@@ -1602,7 +1612,8 @@ async function saveEvent(ev,id){
 }
 async function doSaveResult(){
   const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prize=document.getElementById('res-prize').value, grade=document.getElementById('res-grade').value||'';
-  const position=prize==='1ST'?1:prize==='2'?2:prize==='3'?3:0, points=Number(document.getElementById('res-points').value)||0;
+  const position=Number(document.getElementById('res-rank')?.value)||0, points=Number(document.getElementById('res-points').value)||0;
+  if(position<1){toast('Enter a valid rank');return;}
   const p=DB.participants.find(x=>x.chest===chest); if(!p){toast('No participant with that chest number');return;}
   const payload={event_id:eid,participant_id:p.id,position,points,grade,prize};
   const {error}=await sb.from('results').upsert(payload,{onConflict:'event_id,participant_id'});
