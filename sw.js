@@ -1,4 +1,4 @@
-const CACHE_NAME = 'democrazy-fest-v8';
+const CACHE_NAME = 'democrazy-fest-v10';
 const APP_SHELL = [
   '/',
   '/index.html',

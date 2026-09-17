@@ -1058,7 +1058,7 @@ function pageAdminResults(){
       <div id="res-preview"></div>
 
       <div class="field"><label>Prize</label><select id="res-prize" onchange="syncResultPoints()">
-        <option value="">NO PRIZE</option>
+        <option value="NO PRIZE">NO PRIZE</option>
         <option value="1ST">1ST</option>
         <option value="2">2ND</option>
         <option value="3">3RD</option>
@@ -1443,7 +1443,7 @@ function editResult(id){
   const prize=document.getElementById('res-prize'), grade=document.getElementById('res-grade'), points=document.getElementById('res-points');
   if(ev) ev.value=r.eventId;
   if(chest) chest.value=p.chest;
-  if(prize) prize.value=r.prize || (r.position===1?'1ST':r.position===2?'2':r.position===3?'3':'');
+  if(prize) prize.value=r.prize || (r.position===1?'1ST':r.position===2?'2':r.position===3?'3':'NO PRIZE');
   if(grade) grade.value=r.grade||'';
   if(points) points.value=Number(r.points)||0;
   resLookup();
@@ -1607,7 +1607,7 @@ async function saveEvent(ev,id){
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Event updated':'Event added');
 }
 async function doSaveResult(){
-  const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prize=document.getElementById('res-prize').value, grade=document.getElementById('res-grade').value||'';
+  const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prizeRaw=document.getElementById('res-prize').value, prize=prizeRaw || 'NO PRIZE', grade=document.getElementById('res-grade').value||'';
   const position=prize==='1ST'?1:prize==='2'?2:prize==='3'?3:0, points=Number(document.getElementById('res-points').value)||0;
   const p=DB.participants.find(x=>x.chest===chest); if(!p){toast('No participant with that chest number');return;}
   const payload={event_id:eid,participant_id:p.id,position,points,grade,prize};
