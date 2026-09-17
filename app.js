@@ -196,7 +196,7 @@ function pageHome(){
   const upcoming = DB.events.filter(e=>e.status==='UPCOMING').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
   const topTeams = rankedTeams().slice(0,3);
   const topParts = rankedParticipants().slice(0,3);
-  const latest = DB.results.slice().reverse().slice(0,3);
+  const latest = DB.results.slice().reverse();
   const latestEventId = latest.length ? latest[0].eventId : null;
   const latestEvent = latestEventId ? event_(latestEventId) : null;
   const latestEventResults = latestEventId ? DB.results
