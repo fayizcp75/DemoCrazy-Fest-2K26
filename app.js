@@ -1607,7 +1607,7 @@ async function saveEvent(ev,id){
   if(error){sbToastError(error);return;} closeModal(); await loadRemoteDB(); render(); toast(id?'Event updated':'Event added');
 }
 async function doSaveResult(){
-  const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prizeRaw=document.getElementById('res-prize').value, prize=prizeRaw || 'NO PRIZE', grade=document.getElementById('res-grade').value||'';
+  const eid=document.getElementById('res-event').value, chest=document.getElementById('res-chest').value.trim(), prizeRaw=document.getElementById('res-prize').value, prize=prizeRaw || 'NO PRIZE', gradeRaw=document.getElementById('res-grade').value, grade=gradeRaw || 'NO GRADE';
   const position=prize==='1ST'?1:prize==='2'?2:prize==='3'?3:0, points=Number(document.getElementById('res-points').value)||0;
   const p=DB.participants.find(x=>x.chest===chest); if(!p){toast('No participant with that chest number');return;}
   const payload={event_id:eid,participant_id:p.id,position,points,grade,prize};
