@@ -123,7 +123,7 @@ const BOTTOM_TABS = [
 ];
 function renderBottomNav(){
   const active = ['home','events','results','leaderboard'].includes(STATE.route) ? STATE.route :
-    (['more','teams','team-detail','announcements','schedule','search','committee','admin','admin-dash','admin-group-leaderboard','admin-participants','admin-teams','admin-events','admin-registrations','admin-results','admin-announcements','admin-committee','admin-contact','admin-about','admin-report','admin-management'].includes(STATE.route) ? 'more' : '');
+    (['more','teams','team-detail','announcements','schedule','search','participant-detail','committee','admin','admin-dash','admin-group-leaderboard','admin-participants','admin-teams','admin-events','admin-registrations','admin-results','admin-announcements','admin-committee','admin-contact','admin-about','admin-report','admin-management'].includes(STATE.route) ? 'more' : '');
   document.getElementById('bottomnav-inner').innerHTML = BOTTOM_TABS.map(t=>`
     <a class="nav-item ${active===t.id?'active':''}" onclick="nav('${t.id}')">
       ${ic(t.icon,21)}<span>${t.label}</span>
@@ -149,7 +149,7 @@ function render(){
   const routes = {
     home: pageHome, events: pageEvents, 'event-details': pageEventDetails, results: pageResults, leaderboard: pageLeaderboard,
     more: pageMore, teams: pageTeams, 'team-detail': pageTeamDetail, announcements: pageAnnouncements,
-    schedule: pageSchedule, search: pageSearch, committee: pageCommittee, contact: pageContact, about: pageAbout,
+    schedule: pageSchedule, search: pageSearch, 'participant-detail': pageParticipantDetail, committee: pageCommittee, contact: pageContact, about: pageAbout,
     admin: pageAdminLogin, 'admin-dash': pageAdminDash, 'admin-group-leaderboard': pageAdminGroupLeaderboard,
     'admin-participants': pageAdminParticipants, 'admin-teams': pageAdminTeams,
     'admin-events': pageAdminEvents, 'admin-registrations': pageAdminRegistrations,
@@ -245,12 +245,17 @@ function pageHome(){
 
   <div class="section-head"><div><div class="eyebrow">Standings</div><h2>Top 3 Teams</h2></div>
   <a class="link-more" onclick="nav('leaderboard')">Full List ${ic('chevronR',14)}</a></div>
-  ${topTeams.map((t,i)=>`
+  ${DB.groupLeaderboardEnabled ? topTeams.map((t,i)=>`
     <div class="rank-row" onclick="nav('team-detail',{id:'${t.id}'})">
       <div class="rank-num r${i+1}">${i+1}</div>
       <div class="rank-info"><div class="name">${t.name}</div><div class="sub">${DB.participants.filter(p=>p.teamId===t.id).length} members</div></div>
       <div class="rank-pts"><b>${t.points}</b><small>points</small></div>
-    </div>`).join('')}
+    </div>`).join('') : `
+    <div class="card" style="padding:38px 22px;text-align:center;margin-top:18px;">
+      <div style="font-size:38px;margin-bottom:12px;">🔒</div>
+      <div style="font-size:18px;font-weight:800;letter-spacing:.2px;">LOCKED FOR SURPRISE</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.6;">Group leaderboard will be revealed soon.</div>
+    </div>`}
 
   <div class="section-head"><div><div class="eyebrow">Standings</div><h2>Top 3 Participants</h2></div>
   <a class="link-more" onclick="nav('leaderboard')">Full List ${ic('chevronR',14)}</a></div>
@@ -482,7 +487,7 @@ function pageLeaderboard(){
       <div style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.6;">Group leaderboard will be revealed soon.</div>
     </div>` ) :
   rankedParticipants().map((p,i)=>`
-    <div class="rank-row">
+    <div class="rank-row" onclick="nav('participant-detail',{id:'${p.id}'})" style="cursor:pointer;">
       <div class="rank-num ${i<3?'r'+(i+1):''}">${i+1}</div>
       <div class="rank-info"><div class="name">${p.name}</div><div class="sub">#${p.chest} · ${team(p.teamId)?.name||'—'}</div></div>
       <div class="rank-pts"><b>${p.points}</b><small>points</small></div>
@@ -615,6 +620,32 @@ function liveParticipantSearch(value){
 function doSearch(){
   const el=document.getElementById('participantSearchInput');
   liveParticipantSearch(el?el.value:'');
+}
+
+function pageParticipantDetail(){
+  const p=participant(STATE.params.id);
+  if(!p) return backHead('Participant','leaderboard')+`<div class="empty">Participant not found.</div>`;
+  const regs=(window._registrations||[]).filter(r=>r.pid===p.id);
+  const events=regs.map(r=>event_(r.eid)).filter(Boolean).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const shareBtn=`<button class="icon-btn" style="margin-left:auto;" onclick="shareParticipantProfile('${p.id}')" title="Share full result" aria-label="Share full result">${ic('share',18)}</button>`;
+  return `
+  <div class="subpage-head"><button class="icon-btn" onclick="nav('leaderboard')">${ic('back',18)}</button><h1>Participant</h1>${shareBtn}</div>
+  <div class="card" style="padding:18px;margin-bottom:22px;display:flex;align-items:center;gap:14px;">
+    <div class="avatar" style="width:52px;height:52px;font-size:16px;">${initials(p.name)}</div>
+    <div><div style="font-weight:700;font-size:15px;">${esc(p.name)}</div>
+    <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${esc(p.chest)} · ${esc(team(p.teamId)?.name||'—')}</div>
+    <div style="margin-top:6px;"><span class="chip chip-upcoming">${Number(p.points)||0} total points</span></div></div>
+  </div>
+  <div class="section-head"><h2>Participated Events</h2></div>
+  ${events.length ? events.map(ev=>{
+    const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
+    return `<div class="rank-row" onclick="nav('event-details',{eventId:'${ev.id}'})" style="cursor:pointer;">
+      <div class="medal ${r&&r.position?medalIcon(r.position):''}">${r&&r.position?medalLabel(r.position):'—'}</div>
+      <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? esc(r.grade||'NO GRADE') : 'NO GRADE'}</div></div>
+      <div class="rank-pts"><b>${r ? Number(r.points)||0 : 0}</b><small>PTS</small></div>
+    </div>`;
+  }).join('') : `<div class="empty">No participated events found.</div>`}
+  `;
 }
 
 /* ============================= SCHEDULE ============================= */
