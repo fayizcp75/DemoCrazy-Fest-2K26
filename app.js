@@ -192,7 +192,7 @@ function liveGlobalSearch(value){
 }
 
 function pageHome(){
-  const live = DB.events.find(e=>e.status==='LIVE');
+  const liveEvents = DB.events.filter(e=>e.status==='LIVE').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
   const upcoming = DB.events.filter(e=>e.status==='UPCOMING').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
   const topTeams = rankedTeams().slice(0,3);
   const topParts = rankedParticipants().slice(0,3);
@@ -214,12 +214,16 @@ function pageHome(){
   <div class="home-live-next-grid">
     <div>
       <div class="section-head home-card-head"><div><div class="eyebrow">Live now</div><h2>Live</h2></div></div>
-      ${live ? `
+      ${liveEvents.length ? `
       <div class="hero-live">
-        <div class="eyebrow-row">${statusChip('LIVE')}</div>
-        <h3>${esc(live.name)}</h3>
-        <p>${ic('mapPin',14)} ${esc(live.venue || 'Venue not set')}</p>
-        <p>In progress · started ${fmtTime(live.time)} today</p>
+        ${liveEvents.map((live,idx)=>`
+          <div class="live-event-item" style="${idx ? 'margin-top:14px;padding-top:14px;border-top:1px solid var(--border);' : ''}">
+            <div class="eyebrow-row">${statusChip('LIVE')}</div>
+            <h3>${esc(live.name)}</h3>
+            <p>${ic('mapPin',14)} ${esc(live.venue || 'Venue not set')}</p>
+            <p>In progress · started ${fmtTime(live.time)} today</p>
+          </div>
+        `).join('')}
       </div>` : `<div class="hero-none">No event is live right now — check Events for what's next.</div>`}
     </div>
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'democrazy-v10';
+const CACHE_NAME = 'democrazy-v11';
 const APP_SHELL = [
   '/',
   '/index.html',
