@@ -123,7 +123,7 @@ const BOTTOM_TABS = [
 ];
 function renderBottomNav(){
   const active = ['home','events','results','leaderboard'].includes(STATE.route) ? STATE.route :
-    (['more','teams','team-detail','announcements','schedule','search','participant-detail','committee','admin','admin-dash','admin-group-leaderboard','admin-participants','admin-teams','admin-events','admin-registrations','admin-results','admin-announcements','admin-committee','admin-contact','admin-about','admin-report','admin-management'].includes(STATE.route) ? 'more' : '');
+    (['more','teams','team-detail','announcements','schedule','search','committee','admin','admin-dash','admin-participants','admin-teams','admin-events','admin-registrations','admin-results','admin-announcements','admin-committee','admin-contact','admin-about','admin-report','admin-management'].includes(STATE.route) ? 'more' : '');
   document.getElementById('bottomnav-inner').innerHTML = BOTTOM_TABS.map(t=>`
     <a class="nav-item ${active===t.id?'active':''}" onclick="nav('${t.id}')">
       ${ic(t.icon,21)}<span>${t.label}</span>
@@ -149,8 +149,8 @@ function render(){
   const routes = {
     home: pageHome, events: pageEvents, 'event-details': pageEventDetails, results: pageResults, leaderboard: pageLeaderboard,
     more: pageMore, teams: pageTeams, 'team-detail': pageTeamDetail, announcements: pageAnnouncements,
-    schedule: pageSchedule, search: pageSearch, 'participant-detail': pageParticipantDetail, committee: pageCommittee, contact: pageContact, about: pageAbout,
-    admin: pageAdminLogin, 'admin-dash': pageAdminDash, 'admin-group-leaderboard': pageAdminGroupLeaderboard,
+    schedule: pageSchedule, search: pageSearch, committee: pageCommittee, contact: pageContact, about: pageAbout,
+    admin: pageAdminLogin, 'admin-dash': pageAdminDash,
     'admin-participants': pageAdminParticipants, 'admin-teams': pageAdminTeams,
     'admin-events': pageAdminEvents, 'admin-registrations': pageAdminRegistrations,
     'admin-results': pageAdminResults, 'admin-announcements': pageAdminAnnouncements,
@@ -250,12 +250,7 @@ function pageHome(){
       <div class="rank-num r${i+1}">${i+1}</div>
       <div class="rank-info"><div class="name">${t.name}</div><div class="sub">${DB.participants.filter(p=>p.teamId===t.id).length} members</div></div>
       <div class="rank-pts"><b>${t.points}</b><small>points</small></div>
-    </div>`).join('') : `
-    <div class="card" style="padding:38px 22px;text-align:center;margin-top:18px;">
-      <div style="font-size:38px;margin-bottom:12px;">🔒</div>
-      <div style="font-size:18px;font-weight:800;letter-spacing:.2px;">LOCKED FOR SURPRISE</div>
-      <div style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.6;">Group leaderboard will be revealed soon.</div>
-    </div>`}
+    </div>`).join('') : `<div class="card" style="padding:28px 18px;margin-bottom:18px;text-align:center;border-style:dashed;"><div style="font-size:30px;margin-bottom:10px;">🔒</div><div style="font-family:var(--ff-display);font-weight:800;font-size:16px;">LOCKED FOR SURPRISE</div></div>`}
 
   <div class="section-head"><div><div class="eyebrow">Standings</div><h2>Top 3 Participants</h2></div>
   <a class="link-more" onclick="nav('leaderboard')">Full List ${ic('chevronR',14)}</a></div>
@@ -480,14 +475,9 @@ function pageLeaderboard(){
       <div class="rank-num ${i<3?'r'+(i+1):''}">${i+1}</div>
       <div class="rank-info"><div class="name">${t.name}</div><div class="sub">${DB.participants.filter(p=>p.teamId===t.id).length} members</div></div>
       <div class="rank-pts"><b>${t.points}</b><small>points</small></div>
-    </div>`).join('') : `
-    <div class="card" style="padding:38px 22px;text-align:center;margin-top:18px;">
-      <div style="font-size:38px;margin-bottom:12px;">🔒</div>
-      <div style="font-size:18px;font-weight:800;letter-spacing:.2px;">LOCKED FOR SURPRISE</div>
-      <div style="font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.6;">Group leaderboard will be revealed soon.</div>
-    </div>` ) :
+    </div>`).join('') : `<div class="card" style="padding:32px 18px;text-align:center;border-style:dashed;"><div style="font-size:34px;margin-bottom:10px;">🔒</div><div style="font-family:var(--ff-display);font-weight:800;font-size:17px;">LOCKED FOR SURPRISE</div><div style="color:var(--text-dim);font-size:12px;margin-top:7px;">Group leaderboard will be revealed soon.</div></div>`) :
   rankedParticipants().map((p,i)=>`
-    <div class="rank-row" onclick="nav('participant-detail',{id:'${p.id}'})" style="cursor:pointer;">
+    <div class="rank-row">
       <div class="rank-num ${i<3?'r'+(i+1):''}">${i+1}</div>
       <div class="rank-info"><div class="name">${p.name}</div><div class="sub">#${p.chest} · ${team(p.teamId)?.name||'—'}</div></div>
       <div class="rank-pts"><b>${p.points}</b><small>points</small></div>
@@ -519,7 +509,7 @@ function moreDesc(id){
 function pageTeams(){
   return `
   ${backHead('Teams','more')}
-  <div class="team-grid">
+  ${DB.groupLeaderboardEnabled ? `<div class="team-grid">
     ${rankedTeams().map((t,i)=>`
     <a class="card team-card" onclick="nav('team-detail',{id:'${t.id}'})">
       <div class="tc-rank">#${i+1}</div>
@@ -527,12 +517,13 @@ function pageTeams(){
       <div class="tc-name">${t.name}</div>
       <div class="tc-pts">${t.points} pts · ${DB.participants.filter(p=>p.teamId===t.id).length} members</div>
     </a>`).join('')}
-  </div>`;
+  </div>` : `<div class="card" style="padding:42px 18px;text-align:center;border-style:dashed;margin-top:8px;"><div style="font-size:38px;margin-bottom:12px;">🔒</div><div style="font-family:var(--ff-display);font-weight:800;font-size:18px;">LOCKED FOR SURPRISE</div><div style="color:var(--text-dim);font-size:12px;margin-top:8px;">Group leaderboard will be revealed soon.</div></div>`}`;
 }
 
 function pageTeamDetail(){
   const t = team(STATE.params.id);
   if(!t) return backHead('Team','teams')+`<div class="empty">Team not found.</div>`;
+  if(!DB.groupLeaderboardEnabled) return `${backHead('Team','teams')}<div class="card" style="padding:42px 18px;text-align:center;border-style:dashed;margin-top:8px;"><div style="font-size:38px;margin-bottom:12px;">🔒</div><div style="font-family:var(--ff-display);font-weight:800;font-size:18px;">LOCKED FOR SURPRISE</div><div style="color:var(--text-dim);font-size:12px;margin-top:8px;">Group leaderboard will be revealed soon.</div></div>`;
   const ranked = rankedTeams();
   const rank = ranked.findIndex(x=>x.id===t.id)+1;
   const members = DB.participants.filter(p=>p.teamId===t.id).sort((a,b)=>String(a.chest).localeCompare(String(b.chest),undefined,{numeric:true}));
@@ -620,32 +611,6 @@ function liveParticipantSearch(value){
 function doSearch(){
   const el=document.getElementById('participantSearchInput');
   liveParticipantSearch(el?el.value:'');
-}
-
-function pageParticipantDetail(){
-  const p=participant(STATE.params.id);
-  if(!p) return backHead('Participant','leaderboard')+`<div class="empty">Participant not found.</div>`;
-  const regs=(window._registrations||[]).filter(r=>r.pid===p.id);
-  const events=regs.map(r=>event_(r.eid)).filter(Boolean).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-  const shareBtn=`<button class="icon-btn" style="margin-left:auto;" onclick="shareParticipantProfile('${p.id}')" title="Share full result" aria-label="Share full result">${ic('share',18)}</button>`;
-  return `
-  <div class="subpage-head"><button class="icon-btn" onclick="nav('leaderboard')">${ic('back',18)}</button><h1>Participant</h1>${shareBtn}</div>
-  <div class="card" style="padding:18px;margin-bottom:22px;display:flex;align-items:center;gap:14px;">
-    <div class="avatar" style="width:52px;height:52px;font-size:16px;">${initials(p.name)}</div>
-    <div><div style="font-weight:700;font-size:15px;">${esc(p.name)}</div>
-    <div style="color:var(--text-dim);font-size:12.5px;margin-top:3px;">#${esc(p.chest)} · ${esc(team(p.teamId)?.name||'—')}</div>
-    <div style="margin-top:6px;"><span class="chip chip-upcoming">${Number(p.points)||0} total points</span></div></div>
-  </div>
-  <div class="section-head"><h2>Participated Events</h2></div>
-  ${events.length ? events.map(ev=>{
-    const r=DB.results.find(x=>x.eventId===ev.id && x.participantId===p.id);
-    return `<div class="rank-row" onclick="nav('event-details',{eventId:'${ev.id}'})" style="cursor:pointer;">
-      <div class="medal ${r&&r.position?medalIcon(r.position):''}">${r&&r.position?medalLabel(r.position):'—'}</div>
-      <div class="rank-info"><div class="name">${esc(ev.name)}</div><div class="sub">${r ? esc(r.grade||'NO GRADE') : 'NO GRADE'}</div></div>
-      <div class="rank-pts"><b>${r ? Number(r.points)||0 : 0}</b><small>PTS</small></div>
-    </div>`;
-  }).join('') : `<div class="empty">No participated events found.</div>`}
-  `;
 }
 
 /* ============================= SCHEDULE ============================= */
@@ -780,35 +745,24 @@ function pageAdminDash(){
     <div style="flex:1;"><b style="font-size:14px;">Online Now</b><div style="font-size:11px;color:var(--text-dim);">Active app sessions</div></div>
     <div id="onlineCount" style="font-size:22px;font-weight:800;">${ONLINE_COUNT}</div>
   </div>
+  ${isSuperAdmin()?`<div class="card" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+    <div style="flex:1;"><b style="font-size:14px;">Group Leaderboard</b><div style="font-size:11px;color:var(--text-dim);">${DB.groupLeaderboardEnabled?'Visible to public':'Locked for surprise'}</div></div>
+    <button class="mini-btn ${DB.groupLeaderboardEnabled?'danger':''}" onclick="toggleGroupLeaderboard()">${DB.groupLeaderboardEnabled?'Turn OFF':'Turn ON'}</button>
+  </div>`:''}
   <div class="admin-grid">
     ${isSuperAdmin()?`${adminTile('admin-participants','users','Participants','Add & edit participants')}${adminTile('admin-teams','team','Teams','Manage teams & leaders')}${adminTile('admin-events','events','Events','Create & update events')}${adminTile('admin-registrations','check','Registrations','Register by chest no.')}`:''}
-    ${adminTile('admin-results','award','Results','Enter event results')}${adminTile('admin-announcements','megaphone','Announcements','Publish updates')}${isSuperAdmin()?`${adminTile('admin-about','info','About Fest','Edit fest information')}${adminTile('admin-group-leaderboard','leaderboard','Group Leaderboard',DB.groupLeaderboardEnabled?'Visible to public':'Locked for surprise')}`:''}
+    ${adminTile('admin-results','award','Results','Enter event results')}${adminTile('admin-announcements','megaphone','Announcements','Publish updates')}${isSuperAdmin()?adminTile('admin-about','info','About Fest','Edit fest information'):''}
     ${isSuperAdmin()?`${adminTile('admin-committee','users','Fest Committee','Manage names, roles & photos')}${adminTile('admin-contact','phone','Contact Us','Manage names, roles, phones & photos')}${adminTile('admin-report','doc','Final Report','Generate full report')}${adminTile('admin-management','shield','Admin Management','Add, edit & remove admins')}`:''}
   </div>`);
 }
-function adminTile(route,icon,title,sub){ return `<a class="card admin-tile" onclick="nav('${route}')"><div class="ai">${ic(icon,18)}</div><b>${title}</b><span>${sub}</span></a>`; }
-
-/* ============================= ADMIN: GROUP LEADERBOARD ============================= */
-function pageAdminGroupLeaderboard(){
-  return requireSuperAdmin(()=>`
-  ${backHead('Group Leaderboard','admin-dash')}
-  <div class="hint-box"><b>Super Admin only.</b> Control whether the public Group Leaderboard is visible.</div>
-  <div class="card" style="padding:18px;margin-top:14px;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div class="ai" style="margin:0;">${ic('leaderboard',20)}</div>
-      <div style="flex:1;"><b style="font-size:15px;">Group Leaderboard</b><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${DB.groupLeaderboardEnabled?'Currently visible':'Currently locked for surprise'}</div></div>
-      <button class="mini-btn" onclick="toggleGroupLeaderboard()">${DB.groupLeaderboardEnabled?'Turn OFF':'Turn ON'}</button>
-    </div>
-  </div>`);
-}
 async function toggleGroupLeaderboard(){
+  if(!isSuperAdmin()) return;
   const next=!DB.groupLeaderboardEnabled;
   const {error}=await sb.from('about_fest').upsert({id:'main',group_leaderboard_enabled:next,updated_at:new Date().toISOString()});
   if(error){sbToastError(error,'Could not update Group Leaderboard');return;}
-  DB.groupLeaderboardEnabled=next;
-  toast(next?'Group Leaderboard ON':'Group Leaderboard locked for surprise');
-  render();
+  DB.groupLeaderboardEnabled=next; toast(next?'Group Leaderboard ON':'Group Leaderboard locked'); render();
 }
+function adminTile(route,icon,title,sub){ return `<a class="card admin-tile" onclick="nav('${route}')"><div class="ai">${ic(icon,18)}</div><b>${title}</b><span>${sub}</span></a>`; }
 
 /* ============================= ADMIN: ADMIN MANAGEMENT ============================= */
 function pageAdminManagement(){
@@ -1595,7 +1549,7 @@ async function loadRemoteDB(){
   DB.contacts=contacts.map(c=>({id:c.id,role:c.role,name:c.name,phone:c.phone||'',photo:c.photo||'',sortOrder:Number(c.sort_order)||0}));
   const aboutMain=aboutRows.find(a=>a.id==='main');
   DB.aboutContent=aboutMain?.content||'';
-  DB.groupLeaderboardEnabled=aboutMain?.group_leaderboard_enabled !== false;
+  DB.groupLeaderboardEnabled=aboutMain?.group_leaderboard_enabled!==false;
   const eventVideos=get('event_participant_videos').data;
   DB.eventParticipantVideos=eventVideos.map(v=>({id:v.id,eventId:v.event_id,participantId:v.participant_id,videoUrl:v.video_url||''}));
   window._registrations=registrations.map(r=>({id:r.id,eid:r.event_id,pid:r.participant_id}));
